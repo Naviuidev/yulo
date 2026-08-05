@@ -1,0 +1,373 @@
+/* Hero - Full Bleed */
+.hero-banner {
+  position: relative;
+  min-height: 90vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.hero-banner__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.hero-banner__bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-banner__overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.35) 45%, rgba(0, 0, 0, 0.65) 100%),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.55) 100%);
+  z-index: 1;
+}
+
+.hero-banner__content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  color: var(--secondary);
+  padding: 2.5rem 2rem;
+  max-width: 720px;
+}
+
+.hero-banner__logo-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+  padding: 1.25rem 1.75rem;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+}
+
+.hero-banner__logo {
+  width: min(280px, 68vw);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.65));
+}
+
+.hero-banner__brand {
+  font-size: clamp(3rem, 8vw, 6rem);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+}
+
+.hero-banner__tagline {
+  font-size: clamp(0.875rem, 2vw, 1.125rem);
+  font-weight: 300;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  margin-bottom: 2rem;
+}
+
+.hero-banner__gold-line {
+  width: 80px;
+  height: 2px;
+  background: var(--accent);
+  margin: 0 auto 2.5rem;
+}
+
+.hero-banner__cta {
+  display: inline-flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Featured Collection */
+.featured-collection {
+  background: var(--secondary);
+}
+
+.featured-collection__grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.featured-collection__main {
+  grid-column: span 7;
+  position: relative;
+  min-height: 520px;
+  height: 100%;
+  overflow: hidden;
+  display: block;
+}
+
+.featured-collection__main img,
+.featured-collection__item img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.8s ease;
+}
+
+.featured-collection__main:hover img,
+.featured-collection__item:hover img {
+  transform: scale(1.05);
+}
+
+.featured-collection__side {
+  grid-column: span 5;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 520px;
+}
+
+.featured-collection__item {
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.featured-collection__label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 2rem;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  color: var(--secondary);
+}
+
+.featured-collection__label h3 {
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
+/* Categories */
+.categories-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.category-card {
+  position: relative;
+  aspect-ratio: 3/4;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.category-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+
+.category-card:hover img {
+  transform: scale(1.08);
+}
+
+.category-card__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 1.5rem;
+  background: linear-gradient(transparent 50%, rgba(0, 0, 0, 0.6));
+}
+
+.category-card__name {
+  color: var(--secondary);
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Flash Sale */
+.flash-sale {
+  background: var(--primary);
+  color: var(--secondary);
+}
+
+.flash-sale .section-title {
+  color: var(--secondary);
+}
+
+.flash-sale .gold-line {
+  background: var(--accent);
+}
+
+/* Brands Strip */
+.brands-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 3rem;
+  padding: 2rem 0;
+}
+
+.brand-logo {
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--gray);
+  transition: color var(--transition);
+}
+
+.brand-logo:hover {
+  color: var(--primary);
+}
+
+/* Reviews */
+.review-card {
+  padding: 2rem;
+  border: 1px solid var(--border);
+  height: 100%;
+}
+
+.review-card__quote {
+  font-size: 2rem;
+  color: var(--accent);
+  line-height: 1;
+  margin-bottom: 1rem;
+}
+
+.review-card__text {
+  font-size: 0.9375rem;
+  font-weight: 300;
+  margin-bottom: 1.5rem;
+  line-height: 1.8;
+}
+
+.review-card__author {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+/* Instagram */
+.instagram-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.instagram-grid__item {
+  aspect-ratio: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.instagram-grid__item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.instagram-grid__item:hover img {
+  transform: scale(1.1);
+}
+
+.instagram-grid__item::after {
+  content: '\F437';
+  font-family: 'bootstrap-icons';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--secondary);
+  font-size: 1.5rem;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.instagram-grid__item:hover::after {
+  opacity: 1;
+}
+
+/* Newsletter Home */
+.newsletter-section {
+  background: var(--bg);
+  text-align: center;
+}
+
+.newsletter-section .form-control {
+  border-radius: 0;
+  border: 1px solid var(--border);
+  padding: 0.875rem 1.25rem;
+  max-width: 400px;
+}
+
+/* FAQ Accordion */
+.faq-accordion .accordion-item {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+}
+
+.faq-accordion .accordion-button {
+  background: transparent;
+  font-family: var(--font);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  padding: 1.25rem 0;
+  box-shadow: none;
+}
+
+.faq-accordion .accordion-button:not(.collapsed) {
+  color: var(--primary);
+  background: transparent;
+}
+
+.faq-accordion .accordion-body {
+  padding: 0 0 1.25rem;
+  color: var(--gray);
+  font-size: 0.9375rem;
+}
+
+@media (max-width: 991px) {
+  .featured-collection__main,
+  .featured-collection__side {
+    grid-column: span 12;
+  }
+
+  .categories-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .instagram-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 575px) {
+  .hero-banner {
+    min-height: 80vh;
+  }
+
+  .categories-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .instagram-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

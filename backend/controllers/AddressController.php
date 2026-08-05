@@ -1,0 +1,108 @@
+<?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/BaseController.php';
+
+final class AddressController extends BaseController
+{
+    public function index(array $params = []): void
+    {
+        $userId = $this->authUserId();
+        $stmt = $this->db->prepare('SELECT * FROM addresses WHERE user_id = :user_id ORDER BY is_default DESC, created_at DESC');
+        $stmt->execute(['user_id' => $userId]);
+        Response::jsonSuccess($stmt->fetchAll());
+    }
+
+    public function store(array $params = []): void
+    {
+        $input = $this->getJsonInput();
+        $userId = $this->authUserId();
+
+        $validator = Validator::make($input)
+            ->required('name')
+            ->required('phone')
+            ->phone('phone')
+            ->required('address_line1')
+            ->required('city')
+            ->required('state')
+            ->required('pincode');
+
+        if ($validator->fails()) {
+            Response::jsonError('Validation failed.', 422, $validator->errors());
+        }
+
+        if (!empty($input['is_default'])) {
+            $this->db->prepare('UPDATE addresses SET is_default = 0 WHERE user_id = :user_id')->execute(['user_id' => $userId]);
+        }
+
+        $stmt = $this->db->prepare(
+            'INSERT INTO addresses (user_id, name, phone, address_line1, address_line2, city, state, pincode, country, type, is_default, created_at, updated_at)
+             VALUES (:user_id, :name, :phone, :address_line1, :address_line2, :city, :state, :pincode, :country, :type, :is_default, NOW(), NOW())'
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'name' => $input['name'],
+            'phone' => $input['phone'],
+            'address_line1' => $input['address_line1'],
+            'address_line2' => $input['address_line2'] ?? null,
+            'city' => $input['city'],
+            'state' => $input['state'],
+            'pincode' => $input['pincode'],
+            'country' => $input['country'] ?? 'India',
+            'type' => $input['type'] ?? 'shipping',
+            'is_default' => !empty($input['is_default']) ? 1 : 0,
+        ]);
+
+        Response::jsonSuccess(['id' => (int) $this->db->lastInsertId()], 'Address added.', 201);
+    }
+
+    public function update(array $params): void
+    {
+        $input = $this->getJsonInput();
+        $userId = $this->authUserId();
+
+        if (!empty($input['is_default'])) {
+            $this->db->prepare('UPDATE addresses SET is_default = 0 WHERE user_id = :user_id')->execute(['user_id' => $userId]);
+        }
+
+        $stmt = $this->db->prepare(
+            'UPDATE addresses SET name = :name, phone = :phone, address_line1 = :address_line1, address_line2 = :address_line2,
+             city = :city, state = :state, pincode = :pincode, country = :country, type = :type, is_default = :is_default, updated_at = NOW()
+             WHERE id = :id AND user_id = :user_id'
+        );
+        $stmt->execute([
+            'name' => $input['name'] ?? '',
+            'phone' => $input['phone'] ?? '',
+            'address_line1' => $input['address_line1'] ?? '',
+            'address_line2' => $input['address_line2'] ?? null,
+            'city' => $input['city'] ?? '',
+            'state' => $input['state'] ?? '',
+            'pincode' => $input['pincode'] ?? '',
+            'country' => $input['country'] ?? 'India',
+            'type' => $input['type'] ?? 'shipping',
+            'is_default' => !empty($input['is_default']) ? 1 : 0,
+            'id' => $params['id'],
+            'user_id' => $userId,
+        ]);
+
+        if ($stmt->rowCount() === 0) {
+            Response::jsonError('Address not found.', 404);
+        }
+
+        Response::jsonSuccess(null, 'Address updated.');
+    }
+
+    public function destroy(array $params): void
+    {
+        $userId = $this->authUserId();
+        $stmt = $this->db->prepare('DELETE FROM addresses WHERE id = :id AND user_id = :user_id');
+        $stmt->execute(['id' => $params['id'], 'user_id' => $userId]);
+
+        if ($stmt->rowCount() === 0) {
+            Response::jsonError('Address not found.', 404);
+        }
+
+        Response::jsonSuccess(null, 'Address deleted.');
+    }
+}

@@ -1,0 +1,16 @@
+{
+    "name": "yulo/ecommerce-api",
+    "description": "YULO eCommerce REST API - Core PHP 8.3",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": ">=8.3",
+        "phpmailer/phpmailer": "^6.9"
+    },
+    "autoload": {
+        "psr-4": {}
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

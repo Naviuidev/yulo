@@ -1,0 +1,91 @@
+<?php
+
+declare(strict_types=1);
+
+final class User
+{
+    public function __construct(private PDO $db)
+    {
+    }
+
+    public function findById(int $id): ?array
+    {
+        $stmt = $this->db->prepare('SELECT id, name, email, phone, role, status, email_verified_at, created_at FROM users WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $id]);
+        $user = $stmt->fetch();
+        return $user ?: null;
+    }
+
+    public function findByEmail(string $email): ?array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM users WHERE email = :email LIMIT 1');
+        $stmt->execute(['email' => $email]);
+        $user = $stmt->fetch();
+        return $user ?: null;
+    }
+
+    public function create(array $data): int
+    {
+        $stmt = $this->db->prepare(
+            'INSERT INTO users (name, email, password, phone, role, status, created_at, updated_at)
+             VALUES (:name, :email, :password, :phone, :role, :status, NOW(), NOW())'
+        );
+        $stmt->execute([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => $data['password'],
+            'phone' => $data['phone'] ?? null,
+            'role' => $data['role'] ?? 'customer',
+            'status' => $data['status'] ?? 'active',
+        ]);
+        return (int) $this->db->lastInsertId();
+    }
+
+    public function update(int $id, array $data): bool
+    {
+        $fields = [];
+        $params = ['id' => $id];
+
+        foreach ($data as $key => $value) {
+            $fields[] = "{$key} = :{$key}";
+            $params[$key] = $value;
+        }
+
+        if (empty($fields)) {
+            return false;
+        }
+
+        $fields[] = 'updated_at = NOW()';
+        $sql = 'UPDATE users SET ' . implode(', ', $fields) . ' WHERE id = :id';
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute($params);
+    }
+
+    public function storeRefreshToken(int $userId, string $token, string $expiresAt): void
+    {
+        $stmt = $this->db->prepare(
+            'INSERT INTO refresh_tokens (user_id, token, expires_at, created_at) VALUES (:user_id, :token, :expires_at, NOW())'
+        );
+        $stmt->execute(['user_id' => $userId, 'token' => hash('sha256', $token), 'expires_at' => $expiresAt]);
+    }
+
+    public function findRefreshToken(string $token): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT rt.*, u.id as user_id, u.email, u.role, u.status
+             FROM refresh_tokens rt
+             JOIN users u ON u.id = rt.user_id
+             WHERE rt.token = :token AND rt.expires_at > NOW() AND rt.revoked_at IS NULL
+             LIMIT 1'
+        );
+        $stmt->execute(['token' => hash('sha256', $token)]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    public function revokeRefreshToken(string $token): void
+    {
+        $stmt = $this->db->prepare('UPDATE refresh_tokens SET revoked_at = NOW() WHERE token = :token');
+        $stmt->execute(['token' => hash('sha256', $token)]);
+    }
+}

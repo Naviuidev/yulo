@@ -48,6 +48,8 @@ $router->post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'
 $router->post('/newsletter/unsubscribe', [NewsletterController::class, 'unsubscribe']);
 $router->get('/cms/{slug}', [CmsController::class, 'show']);
 $router->get('/settings', [SettingsController::class, 'publicSettings']);
+$router->get('/banners', [BannerController::class, 'index']);
+$router->get('/offer-strips', [OfferStripController::class, 'index']);
 
 // Payments callback (public webhook)
 $router->post('/payments/phonepe/callback', [PaymentController::class, 'phonePeCallback']);
@@ -166,6 +168,11 @@ $router->group('/admin', function (Router $router) use ($admin) {
     $router->post('/banners', [BannerAdminController::class, 'store'], $admin);
     $router->put('/banners/{id}', [BannerAdminController::class, 'update'], $admin);
     $router->delete('/banners/{id}', [BannerAdminController::class, 'destroy'], $admin);
+
+    $router->get('/offer-strips', [OfferStripAdminController::class, 'index'], $admin);
+    $router->post('/offer-strips', [OfferStripAdminController::class, 'store'], $admin);
+    $router->put('/offer-strips/{id}', [OfferStripAdminController::class, 'update'], $admin);
+    $router->delete('/offer-strips/{id}', [OfferStripAdminController::class, 'destroy'], $admin);
 
     $router->get('/settings', [SettingsAdminController::class, 'index'], $admin);
     $router->put('/settings', [SettingsAdminController::class, 'update'], $admin);

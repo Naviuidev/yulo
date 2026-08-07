@@ -327,6 +327,17 @@ CREATE TABLE IF NOT EXISTS banners (
     updated_at DATETIME NOT NULL
 ) ENGINE=InnoDB;
 
+-- Offer strips (top bar above navbar)
+CREATE TABLE IF NOT EXISTS offer_strips (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    text VARCHAR(500) NOT NULL,
+    is_scrolling TINYINT(1) NOT NULL DEFAULT 0,
+    sort_order INT DEFAULT 0,
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
+) ENGINE=InnoDB;
+
 -- Settings
 CREATE TABLE IF NOT EXISTS settings (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

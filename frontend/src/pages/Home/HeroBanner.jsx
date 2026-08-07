@@ -1,15 +1,86 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation, EffectFade, Autoplay } from 'swiper/modules';
 import { BRAND_NAME, BRAND_TAGLINE, HERO_IMAGE } from '../../utils/constants';
+import { resolveMediaUrl } from '../../utils/helpers';
 import Button from '../../components/ui/Button';
 import YuloLogo from '../../components/common/YuloLogo';
+import api from '../../services/api';
+import 'swiper/css';
+import 'swiper/css/navigation';
+import 'swiper/css/effect-fade';
 
 export default function HeroBanner() {
+  const [slides, setSlides] = useState([HERO_IMAGE]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { data } = await api.get('/banners', { params: { position: 'home', limit: 3 } });
+        const rows = data?.data ?? [];
+        const urls = rows
+          .map((b) => resolveMediaUrl(b.image))
+          .filter(Boolean);
+        if (!cancelled && urls.length) {
+          setSlides(urls);
+        }
+      } catch {
+        // Keep fallback HERO_IMAGE
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const multi = slides.length > 1;
+
   return (
     <section className="hero-banner">
       <div className="hero-banner__bg">
-        <img src={HERO_IMAGE} alt="YULO eyewear" />
+        <Swiper
+          key={slides.join('|')}
+          className="hero-banner__swiper"
+          modules={[Navigation, EffectFade, Autoplay]}
+          effect="fade"
+          fadeEffect={{ crossFade: true }}
+          speed={900}
+          loop={multi}
+          autoplay={multi ? { delay: 5000, disableOnInteraction: false } : false}
+          navigation={
+            multi
+              ? {
+                  prevEl: '.hero-banner__nav--prev',
+                  nextEl: '.hero-banner__nav--next',
+                }
+              : false
+          }
+          allowTouchMove={multi}
+        >
+          {slides.map((src, i) => (
+            <SwiperSlide key={`${src}-${i}`}>
+              <img src={src} alt="" aria-hidden="true" />
+            </SwiperSlide>
+          ))}
+        </Swiper>
       </div>
+
+      {multi && (
+        <>
+          <button type="button" className="hero-banner__nav hero-banner__nav--prev" aria-label="Previous banner">
+            <i className="bi bi-chevron-left" />
+          </button>
+          <button type="button" className="hero-banner__nav hero-banner__nav--next" aria-label="Next banner">
+            <i className="bi bi-chevron-right" />
+          </button>
+        </>
+      )}
+
       <div className="hero-banner__overlay" />
       <motion.div
         className="hero-banner__content"

@@ -249,16 +249,79 @@
   line-height: 1;
 }
 
-/* Announcement */
+/* Announcement / Offer strip (above navbar) */
 .announcement-bar {
   background: var(--primary);
   color: var(--secondary);
-  text-align: center;
-  padding: 0.625rem 1rem;
+  height: var(--announcement-height);
+  min-height: var(--announcement-height);
+  display: flex;
+  align-items: center;
   font-size: 0.75rem;
   letter-spacing: 0.15em;
   text-transform: uppercase;
   font-weight: 500;
+  overflow: hidden;
+}
+
+.announcement-bar--center {
+  justify-content: center;
+  text-align: center;
+  padding: 0 1rem;
+}
+
+.announcement-bar__static {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.announcement-bar--scroll {
+  position: relative;
+  padding: 0;
+  width: 100%;
+}
+
+/* One message at a time: enter from right, exit fully left, then next (or same) starts */
+.announcement-bar__runner {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  will-change: transform;
+  animation: announcement-run var(--run-duration, 28s) linear forwards;
+  font-size: 0.8125rem;
+  letter-spacing: 0.18em;
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes announcement-run {
+  from {
+    transform: translateY(-50%) translateX(100vw);
+  }
+  to {
+    transform: translateY(-50%) translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .announcement-bar--scroll {
+    justify-content: center;
+  }
+
+  .announcement-bar__runner {
+    position: static;
+    transform: none;
+    animation: none;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 1rem;
+  }
 }
 
 /* Footer */

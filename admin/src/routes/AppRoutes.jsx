@@ -18,6 +18,7 @@ import Coupons from '../pages/Coupons/Coupons';
 import Deliveries from '../pages/Deliveries/Deliveries';
 import Reports from '../pages/Reports/Reports';
 import Banners from '../pages/Banners/Banners';
+import OfferStrips from '../pages/OfferStrips/OfferStrips';
 import Blogs from '../pages/Blogs/Blogs';
 import FAQs from '../pages/FAQs/FAQs';
 import Settings from '../pages/Settings/Settings';
@@ -54,6 +55,7 @@ const AppRoutes = () => (
       <Route path="deliveries" element={<Deliveries />} />
       <Route path="reports" element={<Reports />} />
       <Route path="banners" element={<Banners />} />
+      <Route path="offer-strips" element={<OfferStrips />} />
       <Route path="blogs" element={<Blogs />} />
       <Route path="faqs" element={<FAQs />} />
       <Route path="settings" element={<Settings />} />

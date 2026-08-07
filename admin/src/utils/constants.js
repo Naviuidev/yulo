@@ -56,6 +56,7 @@ export const NAV_ITEMS = [
   { path: '/deliveries', icon: 'bi-truck', label: 'Deliveries' },
   { path: '/reports', icon: 'bi-file-earmark-bar-graph', label: 'Reports' },
   { path: '/banners', icon: 'bi-images', label: 'Banners' },
+  { path: '/offer-strips', icon: 'bi-megaphone', label: 'Offer Strips' },
   { path: '/blogs', icon: 'bi-journal-text', label: 'Blogs' },
   { path: '/faqs', icon: 'bi-question-circle', label: 'FAQs' },
   { path: '/notifications', icon: 'bi-bell', label: 'Notifications' },

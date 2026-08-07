@@ -29,6 +29,14 @@ source "$ROOT/deploy.env"
 : "${REMOTE_ADMIN:?Set REMOTE_ADMIN in deploy.env}"
 : "${REMOTE_API:?Set REMOTE_API in deploy.env}"
 
+# Guard: unquoted ~/... in deploy.env expands to your Mac home and breaks rsync
+if [[ "$REMOTE_WEBSITE" == /Users/* || "$REMOTE_ADMIN" == /Users/* || "$REMOTE_API" == /Users/* ]]; then
+  echo "ERROR: Remote paths look like Mac paths (got $REMOTE_WEBSITE)."
+  echo "In deploy.env use single quotes: REMOTE_WEBSITE='~/public_html'"
+  echo "Or absolute server paths: REMOTE_WEBSITE=/home/$DEPLOY_USER/public_html"
+  exit 1
+fi
+
 SSH=(ssh -p "$DEPLOY_PORT" -o StrictHostKeyChecking=accept-new)
 RSYNC=(rsync -avz --delete --exclude '.env' --exclude '.DS_Store' -e "ssh -p $DEPLOY_PORT -o StrictHostKeyChecking=accept-new")
 TARGET="$DEPLOY_USER@$DEPLOY_HOST"

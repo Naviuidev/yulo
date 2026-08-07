@@ -30,7 +30,8 @@ api.interceptors.response.use(
       if (!window.location.pathname.includes('/login')) {
         window.location.href = '/login';
       }
-    } else if (status !== 422) {
+    } else if (status !== 422 && status !== 409) {
+      // 409 handled by the calling page (e.g. category delete with linked products)
       toast.error(message);
     }
 

@@ -1,9 +1,10 @@
-const ConfirmModal = ({ show, title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', onConfirm, onCancel, variant = 'danger' }) => {
+const ConfirmModal = ({ show, title, message, confirmLabel = 'Delete', cancelLabel = 'Cancel', onConfirm, onCancel, variant = 'danger' }) => {
   if (!show) return null;
 
   return (
     <>
-      <div className="modal fade show d-block" tabIndex="-1" role="dialog">
+      <div className="modal-backdrop fade show yulo-confirm-backdrop" onClick={onCancel} />
+      <div className="modal fade show d-block yulo-confirm-modal" tabIndex="-1" role="dialog" aria-modal="true">
         <div className="modal-dialog modal-dialog-centered">
           <div className="modal-content yulo-modal">
             <div className="modal-header border-0">
@@ -22,7 +23,6 @@ const ConfirmModal = ({ show, title, message, confirmLabel = 'Confirm', cancelLa
           </div>
         </div>
       </div>
-      <div className="modal-backdrop fade show" />
     </>
   );
 };

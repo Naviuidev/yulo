@@ -30,7 +30,7 @@ export default function HeroBanner() {
         <p className="hero-banner__tagline">{BRAND_TAGLINE}</p>
         <div className="hero-banner__cta">
           <Link to="/shop">
-            <Button variant="gold">Shop Collection</Button>
+            <Button variant="white">Shop Collection</Button>
           </Link>
           <Link to="/shop?sort=newest">
             <Button variant="outline" className="text-white border-white" style={{ color: '#fff', borderColor: '#fff' }}>

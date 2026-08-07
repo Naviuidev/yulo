@@ -8,6 +8,8 @@ export const authService = {
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (data) => api.post('/auth/reset-password', data),
   verifyEmail: (token) => api.post('/auth/verify-email', { token }),
+  verifyOtp: ({ email, otp }) => api.post('/auth/verify-email', { email, otp }),
+  resendOtp: (email) => api.post('/auth/resend-otp', { email }),
   refresh: (refreshToken) => api.post('/auth/refresh', { refresh_token: refreshToken }),
 };
 

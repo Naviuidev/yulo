@@ -13,6 +13,7 @@ export default function Button({
     primary: 'btn-yulo',
     outline: 'btn-yulo btn-yulo-outline',
     gold: 'btn-yulo btn-yulo-gold',
+    white: 'btn-yulo btn-yulo-white',
   };
 
   return (

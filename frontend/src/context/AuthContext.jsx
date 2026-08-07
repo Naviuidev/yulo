@@ -44,10 +44,28 @@ export function AuthProvider({ children }) {
   const register = async (data) => {
     const res = await authService.register(data);
     const payload = res.data?.data ?? res.data;
+
+    // OTP required — do not log in yet
+    if (payload?.requires_otp) {
+      return payload;
+    }
+
+    if (payload?.tokens) {
+      storeTokens(payload.tokens);
+      setUser(payload.user);
+      storeUser(payload.user);
+      toast.success('Account created successfully!');
+    }
+
+    return payload;
+  };
+
+  const completeOtpLogin = async ({ email, otp }) => {
+    const res = await authService.verifyOtp({ email, otp });
+    const payload = res.data?.data ?? res.data;
     storeTokens(payload.tokens);
     setUser(payload.user);
     storeUser(payload.user);
-    toast.success('Account created successfully!');
     return payload;
   };
 
@@ -69,6 +87,7 @@ export function AuthProvider({ children }) {
       isAuthenticated: !!user,
       login,
       register,
+      completeOtpLogin,
       logout,
       refreshUser: fetchUser,
     }),

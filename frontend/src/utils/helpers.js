@@ -1,14 +1,31 @@
 import { PLACEHOLDER_IMAGES } from './constants';
 
 export function getProductImage(product, index = 0) {
-  if (!product) return PLACEHOLDER_IMAGES[index % PLACEHOLDER_IMAGES.length];
-  return (
+  const images = getProductImages(product, index);
+  return images[0];
+}
+
+/** Up to 3 resolved image URLs for product cards / galleries. */
+export function getProductImages(product, index = 0) {
+  if (!product) {
+    return [PLACEHOLDER_IMAGES[index % PLACEHOLDER_IMAGES.length]];
+  }
+
+  const fromGallery = (product.images || [])
+    .map((img) => (typeof img === 'string' ? img : img?.image_path || img?.url || ''))
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((path) => resolveMediaUrl(path));
+
+  if (fromGallery.length) return fromGallery;
+
+  const single =
     product.primary_image ||
     product.image ||
     product.image_path ||
-    (product.images?.[0]?.image_path ?? product.images?.[0]?.url) ||
-    PLACEHOLDER_IMAGES[index % PLACEHOLDER_IMAGES.length]
-  );
+    PLACEHOLDER_IMAGES[index % PLACEHOLDER_IMAGES.length];
+
+  return [resolveMediaUrl(single)];
 }
 
 export function getApiData(response) {
@@ -72,4 +89,13 @@ export function buildQueryString(params) {
   });
   const qs = search.toString();
   return qs ? `?${qs}` : '';
+}
+
+/** Resolve relative upload paths (e.g. /uploads/…) to absolute URLs. */
+export function resolveMediaUrl(path) {
+  if (!path) return PLACEHOLDER_IMAGES[0];
+  if (/^https?:\/\//i.test(path) || path.startsWith('data:')) return path;
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8080/api';
+  const origin = apiUrl.replace(/\/api\/?$/, '');
+  return `${origin}/${String(path).replace(/^\//, '')}`;
 }

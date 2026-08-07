@@ -20,7 +20,7 @@ import { CompareContext } from '../../context/CompareContext';
 import { useContext } from 'react';
 import { productService } from '../../services/productService';
 import { COLORS, SIZES } from '../../utils/constants';
-import { getProductImage } from '../../utils/helpers';
+import { getProductImages } from '../../utils/helpers';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/thumbs';
@@ -66,9 +66,7 @@ export default function Product() {
   if (loading) return <Loader fullScreen />;
   if (!product) return <div className="container py-5 text-center">Product not found</div>;
 
-  const images = product.images?.length
-    ? product.images.map((img) => img.image_path ?? img.url)
-    : [getProductImage(product)];
+  const images = getProductImages(product);
 
   const handleAddToCart = () => {
     const variant = product.variants?.find((v) => v.size === selectedSize && v.color === selectedColor);
@@ -122,11 +120,19 @@ export default function Product() {
             </div>
 
             <div className="d-flex flex-wrap gap-2 mb-4">
-              <Button onClick={handleAddToCart}>Add to Cart</Button>
-              <Button variant="outline" onClick={() => toggleWishlist(product)}>
-                <i className={`bi ${isInWishlist(product.id) ? 'bi-heart-fill text-danger' : 'bi-heart'}`} />
+              <Button variant="gold" onClick={handleAddToCart}>Add to Cart</Button>
+              <Button
+                variant={isInWishlist(product.id) ? 'gold' : 'outline'}
+                onClick={() => toggleWishlist(product)}
+                aria-label="Wishlist"
+              >
+                <i className={`bi ${isInWishlist(product.id) ? 'bi-heart-fill' : 'bi-heart'}`} />
               </Button>
-              <Button variant="outline" onClick={() => addToCompare(product)}>
+              <Button
+                variant={isInCompare(product.id) ? 'gold' : 'outline'}
+                onClick={() => addToCompare(product)}
+                aria-label="Compare"
+              >
                 <i className="bi bi-arrow-left-right" />
               </Button>
             </div>

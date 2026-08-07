@@ -128,6 +128,64 @@ final class Product
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
 
-        return ['items' => $stmt->fetchAll(), 'total' => $total];
+        $items = $stmt->fetchAll();
+        return ['items' => $this->attachImages($items), 'total' => $total];
+    }
+
+    /** Attach up to 3 images per product for cards/list responses. */
+    public function attachImages(array $products, int $limit = 3): array
+    {
+        if ($products === []) {
+            return $products;
+        }
+
+        $ids = array_values(array_unique(array_map(
+            static fn($p) => (int) ($p['id'] ?? 0),
+            $products
+        )));
+        $ids = array_values(array_filter($ids));
+
+        if ($ids === []) {
+            return $products;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->db->prepare(
+            "SELECT product_id, id, image_path, is_primary, sort_order
+             FROM product_images
+             WHERE product_id IN ({$placeholders})
+             ORDER BY is_primary DESC, sort_order ASC, id ASC"
+        );
+        $stmt->execute($ids);
+        $rows = $stmt->fetchAll();
+
+        $byProduct = [];
+        foreach ($rows as $row) {
+            $pid = (int) $row['product_id'];
+            if (!isset($byProduct[$pid])) {
+                $byProduct[$pid] = [];
+            }
+            if (count($byProduct[$pid]) >= $limit) {
+                continue;
+            }
+            $byProduct[$pid][] = [
+                'id' => (int) $row['id'],
+                'image_path' => $row['image_path'],
+                'is_primary' => (int) $row['is_primary'],
+                'sort_order' => (int) $row['sort_order'],
+            ];
+        }
+
+        foreach ($products as &$product) {
+            $pid = (int) ($product['id'] ?? 0);
+            $images = $byProduct[$pid] ?? [];
+            $product['images'] = $images;
+            if (empty($product['primary_image']) && $images !== []) {
+                $product['primary_image'] = $images[0]['image_path'];
+            }
+        }
+        unset($product);
+
+        return $products;
     }
 }

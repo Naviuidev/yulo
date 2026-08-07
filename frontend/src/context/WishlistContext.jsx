@@ -42,7 +42,17 @@ export function WishlistProvider({ children }) {
       } else {
         const next = exists
           ? items.filter((i) => (i.product_id ?? i.id) !== productId)
-          : [...items, { id: productId, product_id: productId, product }];
+          : [
+              ...items,
+              {
+                id: productId,
+                product_id: productId,
+                product: {
+                  ...product,
+                  primary_image: product.primary_image ?? product.image,
+                },
+              },
+            ];
         setItems(next);
         setStoredJson(LOCAL_KEY, next);
       }

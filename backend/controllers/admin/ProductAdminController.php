@@ -11,7 +11,7 @@ final class ProductAdminController extends BaseController
         $pagination = Pagination::resolve();
         $search = $_GET['search'] ?? '';
 
-        $where = '1=1';
+        $where = "p.status != 'archived'";
         $bind = [];
 
         if ($search) {
@@ -38,7 +38,10 @@ final class ProductAdminController extends BaseController
         $stmt->bindValue(':offset', $pagination['offset'], PDO::PARAM_INT);
         $stmt->execute();
 
-        Response::jsonPaginate($stmt->fetchAll(), $total, $pagination['page'], $pagination['per_page']);
+        $productModel = new Product($this->db);
+        $items = $productModel->attachImages($stmt->fetchAll());
+
+        Response::jsonPaginate($items, $total, $pagination['page'], $pagination['per_page']);
     }
 
     public function show(array $params): void
@@ -84,12 +87,16 @@ final class ProductAdminController extends BaseController
             'is_featured' => !empty($input['is_featured']) ? 1 : 0,
         ]);
 
-        Response::jsonSuccess(['id' => (int) $this->db->lastInsertId()], 'Product created.', 201);
+        $productId = (int) $this->db->lastInsertId();
+        $this->syncImages($productId, $input['images'] ?? []);
+
+        Response::jsonSuccess(['id' => $productId], 'Product created.', 201);
     }
 
     public function update(array $params): void
     {
         $input = $this->getJsonInput();
+        $productId = (int) $params['id'];
 
         $stmt = $this->db->prepare(
             'UPDATE products SET name = :name, slug = :slug, description = :description, short_description = :short_description,
@@ -109,17 +116,113 @@ final class ProductAdminController extends BaseController
             'brand_id' => $input['brand_id'] ?? null,
             'status' => $input['status'] ?? 'active',
             'is_featured' => !empty($input['is_featured']) ? 1 : 0,
-            'id' => $params['id'],
+            'id' => $productId,
         ]);
+
+        if (array_key_exists('images', $input)) {
+            $this->syncImages($productId, $input['images'] ?? []);
+        }
 
         Response::jsonSuccess(null, 'Product updated.');
     }
 
+    public function uploadImage(array $params = []): void
+    {
+        if (empty($_FILES['image'])) {
+            Response::jsonError('No image file uploaded.', 422);
+        }
+
+        $uploader = new Uploader();
+        $result = $uploader->upload($_FILES['image'], 'products');
+
+        if (!($result['success'] ?? false)) {
+            Response::jsonError($result['message'] ?? 'Upload failed.', 422);
+        }
+
+        Response::jsonSuccess([
+            'path' => '/' . ltrim($result['path'], '/'),
+            'url' => '/' . ltrim($result['path'], '/'),
+        ], 'Image uploaded.');
+    }
+
+    /** Replace product images (max 3). Accepts string paths or { image_path } objects. */
+    private function syncImages(int $productId, mixed $images): void
+    {
+        $this->db->prepare('DELETE FROM product_images WHERE product_id = :id')
+            ->execute(['id' => $productId]);
+
+        if (!is_array($images) || $images === []) {
+            return;
+        }
+
+        $paths = [];
+        foreach ($images as $image) {
+            if (is_string($image)) {
+                $path = trim($image);
+            } elseif (is_array($image)) {
+                $path = trim((string) ($image['image_path'] ?? $image['url'] ?? $image['path'] ?? ''));
+            } else {
+                $path = '';
+            }
+            if ($path !== '') {
+                $paths[] = $path;
+            }
+            if (count($paths) >= 3) {
+                break;
+            }
+        }
+
+        if ($paths === []) {
+            return;
+        }
+
+        $stmt = $this->db->prepare(
+            'INSERT INTO product_images (product_id, image_path, is_primary, sort_order)
+             VALUES (:product_id, :image_path, :is_primary, :sort_order)'
+        );
+
+        foreach ($paths as $index => $path) {
+            $stmt->execute([
+                'product_id' => $productId,
+                'image_path' => $path,
+                'is_primary' => $index === 0 ? 1 : 0,
+                'sort_order' => $index + 1,
+            ]);
+        }
+    }
+
     public function destroy(array $params): void
     {
-        $stmt = $this->db->prepare('UPDATE products SET status = :status, updated_at = NOW() WHERE id = :id');
-        $stmt->execute(['status' => 'archived', 'id' => $params['id']]);
-        Response::jsonSuccess(null, 'Product archived.');
+        $id = (int) ($params['id'] ?? 0);
+
+        $exists = $this->db->prepare('SELECT id FROM products WHERE id = :id LIMIT 1');
+        $exists->execute(['id' => $id]);
+        if (!$exists->fetch()) {
+            Response::jsonError('Product not found.', 404);
+        }
+
+        // Permanently remove related rows, then the product (not soft-inactive/archived)
+        $related = [
+            'product_images',
+            'product_variants',
+            'cart_items',
+            'wishlists',
+            'compare_lists',
+            'reviews',
+            'recently_viewed',
+            'inventory_logs',
+        ];
+
+        foreach ($related as $table) {
+            $this->db->prepare("DELETE FROM {$table} WHERE product_id = :id")->execute(['id' => $id]);
+        }
+
+        // order_items retain price/qty; FK would block delete, so relax briefly
+        $this->db->exec('SET FOREIGN_KEY_CHECKS=0');
+        $this->db->prepare('DELETE FROM products WHERE id = :id')->execute(['id' => $id]);
+        $this->db->exec('SET FOREIGN_KEY_CHECKS=1');
+
+        Response::jsonSuccess(null, 'Product deleted.');
     }
 
     public function bulkUpload(array $params = []): void

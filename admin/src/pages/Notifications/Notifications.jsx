@@ -26,7 +26,7 @@ const Notifications = () => (
       <div className="yulo-card-body p-0">
         {MOCK_NOTIFICATIONS.map((n) => (
           <div key={n.id} className={`yulo-alert-item ${!n.read ? 'bg-light' : ''}`}>
-            <div className="yulo-alert-item__icon" style={{ background: 'rgba(149,101,20,0.15)', color: '#956514' }}>
+            <div className="yulo-alert-item__icon" style={{ background: 'rgba(0,0,0,0.08)', color: '#111' }}>
               <i className={`bi ${iconMap[n.type] || 'bi-bell'}`} />
             </div>
             <div className="flex-grow-1">

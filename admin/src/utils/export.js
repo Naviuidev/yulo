@@ -43,10 +43,10 @@ export const printAsPDF = (title, contentHtml) => {
       <title>${title}</title>
       <style>
         body { font-family: Poppins, sans-serif; padding: 24px; color: #111; }
-        h1 { color: #956514; border-bottom: 2px solid #111; padding-bottom: 8px; }
+        h1 { color: #111; border-bottom: 2px solid #111; padding-bottom: 8px; }
         table { width: 100%; border-collapse: collapse; margin-top: 16px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
-        th { background: #111; color: #956514; }
+        th { background: #111; color: #fff; }
       </style>
     </head>
     <body>

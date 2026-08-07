@@ -57,8 +57,61 @@ final class CategoryAdminController extends BaseController
 
     public function destroy(array $params): void
     {
-        $stmt = $this->db->prepare('UPDATE categories SET status = :status WHERE id = :id');
-        $stmt->execute(['status' => 'inactive', 'id' => $params['id']]);
-        Response::jsonSuccess(null, 'Category deactivated.');
+        $id = (int) ($params['id'] ?? 0);
+
+        $exists = $this->db->prepare('SELECT id FROM categories WHERE id = :id LIMIT 1');
+        $exists->execute(['id' => $id]);
+        if (!$exists->fetch()) {
+            Response::jsonError('Category not found.', 404);
+        }
+
+        // Block delete when products still use this category
+        $countStmt = $this->db->prepare(
+            'SELECT COUNT(*) FROM products WHERE category_id = :id'
+        );
+        $countStmt->execute(['id' => $id]);
+        $productCount = (int) $countStmt->fetchColumn();
+
+        if ($productCount > 0) {
+            $listStmt = $this->db->prepare(
+                'SELECT id, name FROM products WHERE category_id = :id ORDER BY name ASC LIMIT 10'
+            );
+            $listStmt->execute(['id' => $id]);
+            $products = $listStmt->fetchAll();
+
+            Response::jsonError(
+                "Cannot delete this category. Delete the {$productCount} associated product(s) first.",
+                409,
+                ['products' => $products, 'product_count' => $productCount],
+                ['products' => $products, 'product_count' => $productCount]
+            );
+        }
+
+        $this->db->prepare('UPDATE categories SET parent_id = NULL WHERE parent_id = :id')
+            ->execute(['id' => $id]);
+
+        $stmt = $this->db->prepare('DELETE FROM categories WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+
+        Response::jsonSuccess(null, 'Category deleted.');
+    }
+
+    public function uploadIcon(array $params = []): void
+    {
+        if (empty($_FILES['icon'])) {
+            Response::jsonError('No icon file uploaded.', 422);
+        }
+
+        $uploader = new Uploader();
+        $result = $uploader->upload($_FILES['icon'], 'categories');
+
+        if (!($result['success'] ?? false)) {
+            Response::jsonError($result['message'] ?? 'Upload failed.', 422);
+        }
+
+        Response::jsonSuccess([
+            'path' => '/' . ltrim($result['path'], '/'),
+            'url' => '/' . ltrim($result['path'], '/'),
+        ], 'Icon uploaded.');
     }
 }

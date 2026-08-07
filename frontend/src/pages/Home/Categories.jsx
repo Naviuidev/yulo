@@ -1,34 +1,64 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Navigation, Autoplay, FreeMode } from 'swiper/modules';
 import { categoryService } from '../../services/productService';
-import { MOCK_CATEGORIES } from '../../utils/constants';
+import { MOCK_CATEGORIES, PLACEHOLDER_IMAGES } from '../../utils/constants';
+import { resolveMediaUrl } from '../../utils/helpers';
+import 'swiper/css';
+import 'swiper/css/navigation';
+import 'swiper/css/free-mode';
+
+function flattenCategories(items = []) {
+  return items
+    .filter((cat) => !cat.parent_id)
+    .map((cat, i) => ({
+      ...cat,
+      image: cat.image || cat.image_path || PLACEHOLDER_IMAGES[i % PLACEHOLDER_IMAGES.length],
+    }));
+}
 
 export default function Categories() {
   const [categories, setCategories] = useState(MOCK_CATEGORIES);
 
   useEffect(() => {
     categoryService.getCategories()
-      .then((res) => setCategories(res.data?.data ?? MOCK_CATEGORIES))
-      .catch(() => {});
+      .then((res) => {
+        const data = res.data?.data ?? [];
+        const list = flattenCategories(Array.isArray(data) ? data : []);
+        setCategories(list.length ? list : MOCK_CATEGORIES);
+      })
+      .catch(() => setCategories(MOCK_CATEGORIES));
   }, []);
 
   return (
-    <section className="section-padding" style={{ background: 'var(--bg)' }} data-aos="fade-up">
+    <section className="category-slider-section" data-aos="fade-up">
       <div className="container">
-        <div className="text-center mb-5">
-          <h2 className="section-title">Shop by Category</h2>
-          <div className="gold-line" />
-        </div>
-        <div className="categories-grid">
+        <Swiper
+          className="category-slider"
+          modules={[Navigation, Autoplay, FreeMode]}
+          navigation
+          freeMode
+          spaceBetween={16}
+          slidesPerView={3.2}
+          autoplay={{ delay: 3500, disableOnInteraction: false }}
+          breakpoints={{
+            480: { slidesPerView: 4.2, spaceBetween: 16 },
+            768: { slidesPerView: 5.5, spaceBetween: 20 },
+            1024: { slidesPerView: 7, spaceBetween: 24 },
+          }}
+        >
           {categories.map((cat) => (
-            <Link key={cat.id} to={`/shop?category_id=${cat.id}`} className="category-card">
-              <img src={cat.image ?? cat.image_path} alt={cat.name} />
-              <div className="category-card__overlay">
-                <span className="category-card__name">{cat.name}</span>
-              </div>
-            </Link>
+            <SwiperSlide key={cat.id}>
+              <Link to={`/shop?category_id=${cat.id}`} className="category-slide">
+                <div className="category-slide__icon">
+                  <img src={resolveMediaUrl(cat.image ?? cat.image_path)} alt={cat.name} />
+                </div>
+                <span className="category-slide__name">{cat.name}</span>
+              </Link>
+            </SwiperSlide>
           ))}
-        </div>
+        </Swiper>
       </div>
     </section>
   );

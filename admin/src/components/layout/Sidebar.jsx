@@ -5,7 +5,7 @@ import YuloLogo from '../common/YuloLogo';
 const Sidebar = ({ collapsed, mobileOpen, onToggle, onMobileClose }) => (
   <aside className={`yulo-sidebar ${collapsed ? 'yulo-sidebar--collapsed' : ''} ${mobileOpen ? 'yulo-sidebar--open' : ''}`}>
     <div className="yulo-sidebar__brand">
-      <YuloLogo variant="light" className="yulo-sidebar__logo" />
+      <YuloLogo variant="dark" className="yulo-sidebar__logo" />
       {!collapsed && <span className="yulo-sidebar__title">Admin</span>}
     </div>
 

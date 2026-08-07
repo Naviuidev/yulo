@@ -132,7 +132,7 @@ const Dashboard = () => {
               <div className="yulo-card-body p-0">
                 {notifications.map((n) => (
                   <div key={n.id} className="yulo-alert-item">
-                    <div className="yulo-alert-item__icon" style={n.type === 'order' ? { background: 'rgba(149,101,20,0.15)', color: '#956514' } : undefined}>
+                    <div className="yulo-alert-item__icon" style={n.type === 'order' ? { background: 'rgba(0,0,0,0.08)', color: '#111' } : undefined}>
                       <i className={`bi ${n.icon}`} />
                     </div>
                     <span className="small">{n.text}</span>

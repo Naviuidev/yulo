@@ -40,6 +40,13 @@ export const PAYMENT_METHODS = [
   { id: 'phonepe', label: 'PhonePe', icon: 'bi-wallet2' },
 ];
 
+const mockGallery = (start) =>
+  [0, 1, 2].map((offset, i) => ({
+    image_path: PLACEHOLDER_IMAGES[(start + offset) % PLACEHOLDER_IMAGES.length],
+    is_primary: i === 0 ? 1 : 0,
+    sort_order: i + 1,
+  }));
+
 export const MOCK_PRODUCTS = [
   {
     id: 1,
@@ -48,6 +55,7 @@ export const MOCK_PRODUCTS = [
     price: 12999,
     sale_price: 9999,
     primary_image: PLACEHOLDER_IMAGES[0],
+    images: mockGallery(0),
     average_rating: 4.8,
     review_count: 124,
     is_featured: true,
@@ -62,6 +70,7 @@ export const MOCK_PRODUCTS = [
     price: 8499,
     sale_price: null,
     primary_image: PLACEHOLDER_IMAGES[1],
+    images: mockGallery(1),
     average_rating: 4.6,
     review_count: 89,
     is_featured: true,
@@ -75,6 +84,7 @@ export const MOCK_PRODUCTS = [
     price: 6999,
     sale_price: 5499,
     primary_image: PLACEHOLDER_IMAGES[2],
+    images: mockGallery(2),
     average_rating: 4.9,
     review_count: 203,
     is_new: true,
@@ -88,6 +98,7 @@ export const MOCK_PRODUCTS = [
     price: 4999,
     sale_price: null,
     primary_image: PLACEHOLDER_IMAGES[3],
+    images: mockGallery(3),
     average_rating: 4.5,
     review_count: 67,
     brand_name: 'YULO Studio',
@@ -100,6 +111,7 @@ export const MOCK_PRODUCTS = [
     price: 7999,
     sale_price: 6499,
     primary_image: PLACEHOLDER_IMAGES[4],
+    images: mockGallery(4),
     average_rating: 4.7,
     review_count: 156,
     is_featured: true,
@@ -113,6 +125,7 @@ export const MOCK_PRODUCTS = [
     price: 5999,
     sale_price: null,
     primary_image: PLACEHOLDER_IMAGES[5],
+    images: mockGallery(5),
     average_rating: 4.4,
     review_count: 42,
     brand_name: 'YULO Accessories',
@@ -125,6 +138,7 @@ export const MOCK_PRODUCTS = [
     price: 2499,
     sale_price: 1999,
     primary_image: PLACEHOLDER_IMAGES[6],
+    images: mockGallery(6),
     average_rating: 4.3,
     review_count: 312,
     is_new: true,
@@ -138,6 +152,7 @@ export const MOCK_PRODUCTS = [
     price: 5499,
     sale_price: null,
     primary_image: PLACEHOLDER_IMAGES[7],
+    images: mockGallery(7),
     average_rating: 4.6,
     review_count: 98,
     brand_name: 'YULO Studio',
@@ -146,10 +161,12 @@ export const MOCK_PRODUCTS = [
 ];
 
 export const MOCK_CATEGORIES = [
-  { id: 1, name: 'Women', slug: 'women', image: PLACEHOLDER_IMAGES[1] },
-  { id: 2, name: 'Men', slug: 'men', image: PLACEHOLDER_IMAGES[0] },
-  { id: 3, name: 'Accessories', slug: 'accessories', image: PLACEHOLDER_IMAGES[5] },
-  { id: 4, name: 'New Arrivals', slug: 'new-arrivals', image: PLACEHOLDER_IMAGES[2] },
+  { id: 1, name: 'Sunglasses', slug: 'sunglasses', image: PLACEHOLDER_IMAGES[0] },
+  { id: 2, name: 'Optical', slug: 'optical', image: PLACEHOLDER_IMAGES[2] },
+  { id: 3, name: 'Round Frames', slug: 'round-frames', image: PLACEHOLDER_IMAGES[3] },
+  { id: 4, name: 'Classic', slug: 'classic', image: PLACEHOLDER_IMAGES[4] },
+  { id: 5, name: 'Lifestyle', slug: 'lifestyle', image: PLACEHOLDER_IMAGES[5] },
+  { id: 6, name: 'Clear Frames', slug: 'clear-frames', image: PLACEHOLDER_IMAGES[6] },
 ];
 
 export const MOCK_BRANDS = [

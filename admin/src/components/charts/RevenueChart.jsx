@@ -18,8 +18,8 @@ const RevenueChart = ({ labels = [], data = [] }) => {
       {
         label: 'Revenue',
         data,
-        backgroundColor: 'rgba(149, 101, 20, 0.85)',
-        borderColor: '#7a520f',
+        backgroundColor: 'rgba(17, 17, 17, 0.85)',
+        borderColor: '#111111',
         borderWidth: 1,
         borderRadius: 6,
       },

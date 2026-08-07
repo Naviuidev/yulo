@@ -24,15 +24,15 @@ export default function Home() {
 
   return (
     <>
-      <SEO title="Premium Fashion" description="YULO — Wear YULO. Look Awesome. Premium fashion for the modern individual." />
+      <SEO title="Premium Eyewear" description="YULO — Wear YULO. Look Awesome. Premium spectacles, sunglasses, and optical frames." />
       <HeroBanner />
+      <Categories />
       <FeaturedCollection />
       <NewArrivals />
       <Trending />
       <BestSellers />
       <FlashSale />
       <DealOfDay />
-      <Categories />
       <Brands />
       <CustomerReviews />
       <InstagramGallery />

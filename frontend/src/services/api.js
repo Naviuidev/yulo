@@ -49,8 +49,8 @@ api.interceptors.response.use(
       }
     }
 
-    if (status === 403) {
-      toast.error('Access denied.');
+    if (status === 403 && !error.response?.data?.data?.requires_otp) {
+      toast.error(error.response?.data?.message || 'Access denied.');
     }
 
     return Promise.reject(error);

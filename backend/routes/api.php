@@ -13,6 +13,7 @@ $router->post('/auth/login', [AuthController::class, 'login']);
 $router->post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
 $router->post('/auth/reset-password', [AuthController::class, 'resetPassword']);
 $router->post('/auth/verify-email', [AuthController::class, 'verifyEmail']);
+$router->post('/auth/resend-otp', [AuthController::class, 'resendOtp']);
 $router->post('/auth/refresh', [AuthController::class, 'refresh']);
 
 $router->post('/auth/logout', [AuthController::class, 'logout'], [AuthMiddleware::class]);
@@ -109,15 +110,17 @@ $router->group('/admin', function (Router $router) use ($admin) {
 
     // Products
     $router->get('/products', [ProductAdminController::class, 'index'], $admin);
+    $router->post('/products/upload-image', [ProductAdminController::class, 'uploadImage'], $admin);
+    $router->post('/products/bulk-upload', [ProductAdminController::class, 'bulkUpload'], $admin);
     $router->get('/products/{id}', [ProductAdminController::class, 'show'], $admin);
     $router->post('/products', [ProductAdminController::class, 'store'], $admin);
     $router->put('/products/{id}', [ProductAdminController::class, 'update'], $admin);
     $router->delete('/products/{id}', [ProductAdminController::class, 'destroy'], $admin);
-    $router->post('/products/bulk-upload', [ProductAdminController::class, 'bulkUpload'], $admin);
 
     // Categories & Brands
     $router->get('/categories', [CategoryAdminController::class, 'index'], $admin);
     $router->post('/categories', [CategoryAdminController::class, 'store'], $admin);
+    $router->post('/categories/upload-icon', [CategoryAdminController::class, 'uploadIcon'], $admin);
     $router->put('/categories/{id}', [CategoryAdminController::class, 'update'], $admin);
     $router->delete('/categories/{id}', [CategoryAdminController::class, 'destroy'], $admin);
 

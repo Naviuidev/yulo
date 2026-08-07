@@ -44,53 +44,51 @@ const Login = () => {
       <div className="yulo-login">
         <motion.div
           className="yulo-login__card"
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.35 }}
         >
-          <div className="text-center">
-            <YuloLogo variant="accent" className="yulo-login__logo" />
-            <h1 className="yulo-login__title">YULO Admin</h1>
-            <p className="yulo-login__subtitle">Sign in to manage your store</p>
+          <div className="yulo-login__header">
+            <YuloLogo variant="light" className="yulo-login__logo" />
+            <h1 className="yulo-login__title">Welcome back</h1>
+            <p className="yulo-login__subtitle">Sign in to your admin account</p>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <div className="mb-3">
-              <label className="form-label">Email</label>
+          <form className="yulo-login__form" onSubmit={handleSubmit(onSubmit)} noValidate>
+            <div className="yulo-login__field">
+              <label htmlFor="login-email">Email</label>
               <input
+                id="login-email"
                 type="email"
-                className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                placeholder="admin@yulo.com"
+                autoComplete="email"
+                placeholder="Enter your email"
+                className={errors.email ? 'is-invalid' : ''}
                 {...register('email', { required: 'Email is required' })}
               />
-              {errors.email && <div className="invalid-feedback">{errors.email.message}</div>}
+              {errors.email && <span className="yulo-login__error">{errors.email.message}</span>}
             </div>
 
-            <div className="mb-4">
-              <label className="form-label">Password</label>
+            <div className="yulo-login__field">
+              <label htmlFor="login-password">Password</label>
               <input
+                id="login-password"
                 type="password"
-                className={`form-control ${errors.password ? 'is-invalid' : ''}`}
-                placeholder="••••••••"
+                autoComplete="current-password"
+                placeholder="Enter your password"
+                className={errors.password ? 'is-invalid' : ''}
                 {...register('password', { required: 'Password is required' })}
               />
-              {errors.password && <div className="invalid-feedback">{errors.password.message}</div>}
+              {errors.password && <span className="yulo-login__error">{errors.password.message}</span>}
             </div>
 
-            <button type="submit" className="btn btn-gold w-100 py-2" disabled={loading}>
+            <button type="submit" className="yulo-login__btn" disabled={loading}>
               {loading ? (
-                <span className="spinner-border spinner-border-sm me-2" />
+                <span className="spinner-border spinner-border-sm" />
               ) : (
-                <i className="bi bi-box-arrow-in-right me-2" />
+                'Sign In'
               )}
-              Sign In
             </button>
           </form>
-
-          <div className="yulo-login__hint">
-            <strong>Demo credentials:</strong><br />
-            admin@yulo.com / Admin@123
-          </div>
         </motion.div>
       </div>
     </>

@@ -80,7 +80,7 @@ final class ProductController extends BaseController
             'status' => 'active',
         ]);
 
-        Response::jsonSuccess($stmt->fetchAll());
+        Response::jsonSuccess($this->productModel->attachImages($stmt->fetchAll()));
     }
 
     public function frequentlyBought(array $params): void
@@ -103,7 +103,7 @@ final class ProductController extends BaseController
         );
         $stmt->execute(['product_id' => $product['id'], 'status' => 'active']);
 
-        Response::jsonSuccess($stmt->fetchAll());
+        Response::jsonSuccess($this->productModel->attachImages($stmt->fetchAll()));
     }
 
     public function search(array $params = []): void

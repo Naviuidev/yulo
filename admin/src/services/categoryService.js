@@ -17,6 +17,14 @@ const categoryService = {
     const res = await api.delete(`/admin/categories/${id}`);
     return extractData(res);
   },
+  uploadIcon: async (file) => {
+    const form = new FormData();
+    form.append('icon', file);
+    const res = await api.post('/admin/categories/upload-icon', form, {
+      headers: { 'Content-Type': undefined },
+    });
+    return extractData(res);
+  },
 };
 
 export default categoryService;

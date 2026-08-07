@@ -12,11 +12,13 @@ const App = () => (
         <ToastContainer
           position="top-right"
           autoClose={4000}
-          hideProgressBar={false}
+          hideProgressBar
           newestOnTop
           closeOnClick
           pauseOnHover
-          theme="colored"
+          theme="dark"
+          toastClassName="yulo-toast"
+          bodyClassName="yulo-toast__body"
         />
       </BrowserRouter>
     </AuthProvider>

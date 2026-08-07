@@ -12,6 +12,8 @@ export const DOC_CATEGORIES = [
   { id: 'backend', label: 'Backend API', icon: 'bi-hdd-network' },
   { id: 'database', label: 'Database', icon: 'bi-database' },
   { id: 'next', label: 'Next Steps', icon: 'bi-signpost-2' },
+  { id: 'git', label: 'Git', icon: 'bi-git' },
+  { id: 'deployment', label: 'Deployment', icon: 'bi-cloud-upload' },
 ];
 
 export const DOC_ITEMS = [
@@ -591,6 +593,151 @@ php backend/database/seed.php`,
         ],
       },
       { type: 'text', content: 'Add new DOC_ITEMS entries with category, title, tags, files, and next-step checklists.' },
+    ],
+  },
+
+  // ── Git ────────────────────────────────────────────────
+  {
+    id: 'git-backup',
+    category: 'git',
+    title: 'Push Code to GitHub (Backup)',
+    tags: ['git', 'github', 'commit', 'push'],
+    summary: 'Save local changes to GitHub before deploying.',
+    body: [
+      { type: 'text', content: 'Run from the project root on your Mac. Never commit secrets (backend/.env, deploy.env).' },
+      {
+        type: 'code',
+        content: `cd /Users/naveenreddy/Desktop/NaveenHosur/projects/yulo
+
+git status
+
+git add .
+git status
+
+git commit -m "$(cat <<'EOF'
+Describe your change in one short sentence.
+
+EOF
+)"
+
+git push origin main`,
+      },
+      {
+        type: 'files',
+        items: [
+          { label: 'Remote repo', path: 'https://github.com/Naviuidev/yulo.git' },
+          { label: 'Ignored secrets', path: 'backend/.env, deploy.env, *.zip' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'git-daily',
+    category: 'git',
+    title: 'Useful Git Commands',
+    tags: ['git', 'status', 'diff', 'log', 'pull'],
+    summary: 'Everyday commands for checking and syncing code.',
+    body: [
+      {
+        type: 'code',
+        content: `# See changed files
+git status
+
+# See what changed
+git diff
+
+# Recent commits
+git log --oneline -10
+
+# Get latest from GitHub
+git pull origin main
+
+# Undo unstaged file edit (careful)
+git checkout -- path/to/file
+
+# Unstage a file (keep local changes)
+git restore --staged path/to/file`,
+      },
+    ],
+  },
+
+  // ── Deployment ─────────────────────────────────────────
+  {
+    id: 'deploy-one-command',
+    category: 'deployment',
+    title: 'Deploy Localhost → Production',
+    tags: ['deploy', 'milesweb', 'rsync', 'production'],
+    summary: 'Build locally and upload website, admin, and API to MilesWeb.',
+    body: [
+      { type: 'text', content: 'Recommended order: push to GitHub first, then deploy.' },
+      {
+        type: 'code',
+        content: `cd /Users/naveenreddy/Desktop/NaveenHosur/projects/yulo
+
+# 1) Backup to GitHub
+git add .
+git commit -m "Your change summary"
+git push origin main
+
+# 2) Deploy all (website + admin + API)
+./scripts/deploy.sh
+
+# Or deploy only what changed:
+./scripts/deploy.sh website
+./scripts/deploy.sh admin
+./scripts/deploy.sh api
+./scripts/deploy.sh website admin`,
+      },
+      {
+        type: 'files',
+        items: [
+          { label: 'Deploy script', path: 'scripts/deploy.sh' },
+          { label: 'SSH config (local only)', path: 'deploy.env  ← copy from deploy.env.example' },
+          { label: 'Full guide', path: 'DEPLOY.md' },
+        ],
+      },
+      {
+        type: 'checklist',
+        items: [
+          'Enter MilesWeb SSH password when prompted (website → admin → API)',
+          'Production API .env is NOT overwritten by deploy',
+          'Hard refresh browser after deploy (Cmd+Shift+R)',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'deploy-urls',
+    category: 'deployment',
+    title: 'Production URLs & First-Time Setup',
+    tags: ['urls', 'env', 'database', 'health'],
+    summary: 'Live links and what you edit only once (not every deploy).',
+    body: [
+      {
+        type: 'files',
+        items: [
+          { label: 'Website', path: 'https://yulowear.in' },
+          { label: 'Admin', path: 'https://admin.yulowear.in' },
+          { label: 'API health', path: 'https://api.yulowear.in/api/health' },
+          { label: 'Storefront API URL', path: 'frontend/.env.production → VITE_API_URL' },
+          { label: 'Admin API URL', path: 'admin/.env.production → VITE_API_URL' },
+          { label: 'Server API secrets', path: 'api.yulowear.in/.env  (create once; deploy keeps it)' },
+        ],
+      },
+      {
+        type: 'checklist',
+        items: [
+          'First time only: create production API .env on the server',
+          'First time only: import backend/database/schema.sql in phpMyAdmin',
+          'Only import NEW tables / seed SQL when schema or seed data changes',
+          'Normal deploys: no .env edit and no full DB re-import',
+        ],
+      },
+      {
+        type: 'code',
+        content: `# Optional: passwordless SSH (run once)
+ssh-copy-id -p 22 yulowear1@45.199.139.18`,
+      },
     ],
   },
 ];

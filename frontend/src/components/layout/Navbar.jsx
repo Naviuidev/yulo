@@ -30,16 +30,14 @@ export default function Navbar() {
 
   return (
     <nav className="yulo-navbar navbar navbar-expand-lg">
-      <div className="container-fluid px-4">
-        <button className="nav-icon-btn d-lg-none me-2" onClick={toggleMobileMenu} aria-label="Menu">
-          <i className="bi bi-list" />
-        </button>
-
-        <Link className="navbar-brand mx-auto mx-lg-0" to="/">
+      <div className="container-fluid px-3 px-lg-4 yulo-navbar__inner">
+        {/* Mobile / tablet: logo left */}
+        <Link className="navbar-brand yulo-navbar__brand" to="/">
           <YuloLogo variant="dark" className="yulo-navbar__logo" />
         </Link>
 
-        <div className="collapse navbar-collapse justify-content-center d-none d-lg-flex">
+        {/* Desktop center links */}
+        <div className="collapse navbar-collapse justify-content-center d-none d-lg-flex yulo-navbar__links">
           <ul className="navbar-nav">
             {NAV_LINKS.map((link) => (
               <li key={link.to} className="nav-item">
@@ -49,14 +47,19 @@ export default function Navbar() {
           </ul>
         </div>
 
-        <div className="d-flex align-items-center gap-1 ms-lg-auto">
-          <button className="nav-icon-btn" onClick={toggleSearch} aria-label="Search">
+        {/* Desktop icons (lg+) */}
+        <div className="d-none d-lg-flex align-items-center gap-1 yulo-navbar__actions">
+          <button type="button" className="nav-icon-btn" onClick={toggleSearch} aria-label="Search">
             <i className="bi bi-search" />
           </button>
 
           {isAuthenticated ? (
             <div className="dropdown">
-              <button className="nav-icon-btn dropdown-toggle border-0 bg-transparent" data-bs-toggle="dropdown">
+              <button
+                type="button"
+                className="nav-icon-btn dropdown-toggle border-0 bg-transparent"
+                data-bs-toggle="dropdown"
+              >
                 <i className="bi bi-person" />
               </button>
               <ul className="dropdown-menu dropdown-menu-end border-0 shadow-sm rounded-0">
@@ -64,7 +67,7 @@ export default function Navbar() {
                 <li><Link className="dropdown-item" to="/profile">Profile</Link></li>
                 <li><Link className="dropdown-item" to="/orders">Orders</Link></li>
                 <li><hr className="dropdown-divider" /></li>
-                <li><button className="dropdown-item" onClick={handleLogout}>Logout</button></li>
+                <li><button type="button" className="dropdown-item" onClick={handleLogout}>Logout</button></li>
               </ul>
             </div>
           ) : (
@@ -78,7 +81,7 @@ export default function Navbar() {
             {wishlistCount > 0 && <span className="nav-badge">{wishlistCount}</span>}
           </Link>
 
-          <Link to="/compare" className="nav-icon-btn d-none d-md-flex" aria-label="Compare">
+          <Link to="/compare" className="nav-icon-btn" aria-label="Compare">
             <i className="bi bi-arrow-left-right" />
             {compareCount > 0 && <span className="nav-badge">{compareCount}</span>}
           </Link>
@@ -88,6 +91,16 @@ export default function Navbar() {
             {cartCount > 0 && <span className="nav-badge">{cartCount}</span>}
           </Link>
         </div>
+
+        {/* Mobile / tablet: hamburger right */}
+        <button
+          type="button"
+          className="nav-icon-btn yulo-navbar__menu-btn d-lg-none"
+          onClick={toggleMobileMenu}
+          aria-label="Menu"
+        >
+          <i className="bi bi-list" />
+        </button>
       </div>
     </nav>
   );

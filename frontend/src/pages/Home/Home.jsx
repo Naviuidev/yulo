@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 import SEO from '../../components/common/SEO';
+import OfferPopup from '../../components/common/OfferPopup';
 import HeroBanner from './HeroBanner';
 import FeaturedCollection from './FeaturedCollection';
 import NewArrivals from './NewArrivals';
@@ -25,6 +26,7 @@ export default function Home() {
   return (
     <>
       <SEO title="Premium Eyewear" description="YULO — Wear YULO. Look Awesome. Premium spectacles, sunglasses, and optical frames." />
+      <OfferPopup />
       <HeroBanner />
       <Categories />
       <FeaturedCollection />

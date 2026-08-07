@@ -9,4 +9,5 @@
   --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --navbar-height: 72px;
   --announcement-height: 40px;
+  --bottom-nav-height: 64px;
 }

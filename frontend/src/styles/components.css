@@ -180,12 +180,228 @@
   height: var(--navbar-height);
 }
 
+.yulo-navbar__inner {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--navbar-height);
+}
+
 .yulo-navbar .navbar-brand img,
 .yulo-navbar__logo {
   height: 28px;
   width: auto;
   display: block;
   background: transparent;
+}
+
+/* Desktop (lg+): classic logo | centered links | icons */
+@media (min-width: 992px) {
+  .yulo-navbar__inner {
+    justify-content: flex-start;
+  }
+
+  .yulo-navbar__brand {
+    margin: 0;
+    margin-right: 1rem;
+    flex: 0 0 auto;
+  }
+
+  .yulo-navbar__links {
+    flex: 1 1 auto;
+    justify-content: center !important;
+  }
+
+  .yulo-navbar__actions {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+}
+
+/* Mobile + tablet: logo left, hamburger right (icons live in bottom nav) */
+@media (max-width: 991.98px) {
+  .yulo-navbar__inner {
+    justify-content: space-between;
+  }
+
+  .yulo-navbar__brand {
+    margin: 0;
+  }
+
+  .yulo-navbar__menu-btn {
+    margin-left: auto;
+    font-size: 1.5rem;
+  }
+}
+
+/* App-like bottom bar — mobile + tablet (< lg) */
+.yulo-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1030;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  /* Outer shell only adds home-indicator space; labels live in __inner */
+  padding: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: #fff;
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
+}
+
+.yulo-bottom-nav__inner {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: center;
+  height: var(--bottom-nav-height);
+  width: 100%;
+  padding: 0 0.15rem;
+  box-sizing: border-box;
+}
+
+.yulo-bottom-nav__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 6px 2px 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #555;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  appearance: none;
+}
+
+.yulo-bottom-nav__item i {
+  font-size: 1.35rem;
+  line-height: 1;
+  color: #111;
+  flex: 0 0 auto;
+}
+
+.yulo-bottom-nav__label {
+  display: block;
+  flex: 0 0 auto;
+  max-width: 100%;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #555;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yulo-bottom-nav__item.is-active .yulo-bottom-nav__label,
+.yulo-bottom-nav__item.is-active i {
+  color: #000;
+  font-weight: 600;
+}
+
+.yulo-bottom-nav__badge {
+  position: absolute;
+  top: 4px;
+  right: calc(50% - 16px);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #000;
+  color: #fff;
+  font-size: 0.6rem;
+  font-style: normal;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+@media (max-width: 991.98px) {
+  .yulo-app-shell {
+    padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Mobile menu draws from the right (hamburger side) */
+.yulo-mobile-menu__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.yulo-mobile-menu {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 1050;
+  width: min(300px, 86vw);
+  height: 100%;
+  background: #fff;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.12);
+  padding: 0.75rem 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  animation: yulo-menu-in 0.22s ease-out;
+}
+
+.yulo-mobile-menu__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--navbar-height);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+
+.yulo-mobile-menu__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.yulo-mobile-menu__link {
+  display: block;
+  padding: 0.75rem 0;
+  color: #111;
+  text-decoration: none;
+  text-transform: uppercase;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+
+.yulo-mobile-menu__link--btn {
+  border: 0;
+  background: none;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+
+@keyframes yulo-menu-in {
+  from {
+    transform: translateX(12px);
+    opacity: 0.85;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 .yulo-footer__logo {
@@ -289,9 +505,8 @@
   position: absolute;
   top: 50%;
   left: 0;
-  transform: translateY(-50%);
   white-space: nowrap;
-  will-change: transform;
+  will-change: left, transform;
   animation: announcement-run var(--run-duration, 28s) linear forwards;
   font-size: 0.8125rem;
   letter-spacing: 0.18em;
@@ -299,11 +514,14 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* Use left % (parent width) — never 100vw — to avoid mobile horizontal scroll */
 @keyframes announcement-run {
   from {
-    transform: translateY(-50%) translateX(100vw);
+    left: 100%;
+    transform: translateY(-50%) translateX(0);
   }
   to {
+    left: 0;
     transform: translateY(-50%) translateX(-100%);
   }
 }
@@ -373,6 +591,74 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   margin-bottom: 1rem;
+}
+
+/* Homepage offer banner popup */
+.offer-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 1080;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.offer-popup__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.62);
+  cursor: pointer;
+}
+
+.offer-popup__card {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 92vw);
+  background: #111;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  animation: offer-popup-in 0.35s ease-out;
+}
+
+.offer-popup__close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+}
+
+.offer-popup__close:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.offer-popup__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(78vh, 640px);
+  object-fit: cover;
+}
+
+@keyframes offer-popup-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Modal */

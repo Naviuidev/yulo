@@ -20,6 +20,17 @@ body {
   line-height: 1.6;
 }
 
+/* Prevent sideways scroll only on mobile/tablet */
+@media (max-width: 991.98px) {
+  html,
+  body,
+  #root,
+  .yulo-app-shell {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+}
+
 a {
   color: inherit;
   text-decoration: none;

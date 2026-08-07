@@ -6,6 +6,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  max-width: 100%;
 }
 
 .hero-banner__bg {
@@ -209,6 +210,14 @@
 
 .category-slider {
   padding: 0 2rem;
+}
+
+@media (max-width: 991.98px) {
+  .category-slider-section,
+  .category-slider {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
 }
 
 .category-slide {

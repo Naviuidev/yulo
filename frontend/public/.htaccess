@@ -1,0 +1,10 @@
+Options -MultiViews
+RewriteEngine On
+
+# If the request is a real file or folder, serve it
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Everything else → React app
+RewriteRule ^ index.html [L]

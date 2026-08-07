@@ -11,7 +11,7 @@
 --   php backend/database/seed_passwords.php
 -- ============================================================================
 
-USE yulo_db;
+-- Select your database in phpMyAdmin before import (no USE statement — shared hosts use prefixed DB names)
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;

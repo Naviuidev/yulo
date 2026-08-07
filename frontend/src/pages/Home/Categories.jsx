@@ -26,7 +26,8 @@ export default function Categories() {
       .then((res) => {
         const data = res.data?.data ?? [];
         const list = flattenCategories(Array.isArray(data) ? data : []);
-        setCategories(list.length ? list : MOCK_CATEGORIES);
+        // Only fall back to mocks when the API request failed; empty DB stays empty
+        setCategories(list);
       })
       .catch(() => setCategories(MOCK_CATEGORIES));
   }, []);

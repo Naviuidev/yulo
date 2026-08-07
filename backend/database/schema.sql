@@ -1,8 +1,11 @@
 -- YULO eCommerce Database Schema
--- Run this in phpMyAdmin or MySQL CLI after creating database yulo_db
-
-CREATE DATABASE IF NOT EXISTS yulo_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE yulo_db;
+-- Shared hosting (MilesWeb / cPanel):
+--   1. Create DB in cPanel first (e.g. yulowear1_123)
+--   2. Select that DB in phpMyAdmin
+--   3. Import this file (do NOT create yulo_db here — hosts block CREATE DATABASE)
+-- Local MySQL:
+--   CREATE DATABASE yulo_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+--   then: mysql -u root -p yulo_db < schema.sql
 
 -- Users
 CREATE TABLE IF NOT EXISTS users (

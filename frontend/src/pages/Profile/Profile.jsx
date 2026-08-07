@@ -42,10 +42,15 @@ export default function Profile() {
 
   const onSaveAddress = async (data) => {
     try {
-      if (editingAddress) {
-        await addressService.updateAddress(editingAddress, data);
+      const payload = {
+        ...data,
+        name: data.name || data.full_name,
+        phone: String(data.phone || '').replace(/\D/g, '').replace(/^91/, '').slice(-10),
+      };
+      if (editingAddress && editingAddress !== 'new') {
+        await addressService.updateAddress(editingAddress, payload);
       } else {
-        await addressService.createAddress(data);
+        await addressService.createAddress(payload);
       }
       const res = await addressService.getAddresses();
       setAddresses(res.data?.data ?? []);
@@ -116,7 +121,7 @@ export default function Profile() {
             )}
             {addresses.map((addr) => (
               <div key={addr.id} className="border p-3 mb-3">
-                <strong>{addr.full_name}</strong>
+                <strong>{addr.name || addr.full_name}</strong>
                 <p className="small text-muted mb-2">{addr.address_line1}, {addr.city}, {addr.state} {addr.pincode}</p>
                 <div className="d-flex gap-2">
                   <button className="btn btn-link btn-sm p-0" onClick={() => setEditingAddress(addr.id)}>Edit</button>

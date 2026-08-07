@@ -14,6 +14,14 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // LiteSpeed/shared hosts: send PUT/PATCH/DELETE as POST + override header
+  const method = (config.method || 'get').toLowerCase();
+  if (['put', 'patch', 'delete'].includes(method)) {
+    config.headers['X-HTTP-Method-Override'] = method.toUpperCase();
+    config.method = 'post';
+  }
+
   return config;
 });
 

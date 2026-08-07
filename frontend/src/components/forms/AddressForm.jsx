@@ -9,11 +9,23 @@ export default function AddressForm({ onSubmit, defaultValues = {}, loading = fa
       <div className="row g-3">
         <div className="col-md-6">
           <label className="form-label">Full Name</label>
-          <input className={`form-control ${errors.full_name ? 'is-invalid' : ''}`} {...register('full_name', { required: true })} />
+          <input
+            className={`form-control ${errors.name ? 'is-invalid' : ''}`}
+            defaultValue={defaultValues.name || defaultValues.full_name || ''}
+            {...register('name', { required: true })}
+          />
         </div>
         <div className="col-md-6">
-          <label className="form-label">Phone</label>
-          <input className={`form-control ${errors.phone ? 'is-invalid' : ''}`} {...register('phone', { required: true })} />
+          <label className="form-label">Phone (10-digit mobile)</label>
+          <input
+            className={`form-control ${errors.phone ? 'is-invalid' : ''}`}
+            placeholder="9876543210"
+            {...register('phone', {
+              required: true,
+              pattern: { value: /^[6-9]\d{9}$/, message: 'Enter valid 10-digit mobile' },
+            })}
+          />
+          {errors.phone && <div className="invalid-feedback d-block">{errors.phone.message || 'Phone is required'}</div>}
         </div>
         <div className="col-12">
           <label className="form-label">Address Line 1</label>

@@ -12,7 +12,7 @@ foreach (file($base . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as
     $_ENV[trim($k)] = trim($v, " \t\"'");
 }
 
-require_once $base . '/config/database.php';
+require_once $base . '/config/Database.php';
 
 $pdo = Database::getInstance();
 $checks = [

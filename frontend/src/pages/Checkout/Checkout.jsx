@@ -95,10 +95,15 @@ export default function Checkout() {
 
   const saveAddress = async (data) => {
     try {
-      const res = await addressService.createAddress(data);
+      const payload = {
+        ...data,
+        name: data.name || data.full_name,
+        phone: String(data.phone || '').replace(/\D/g, '').replace(/^91/, '').slice(-10),
+      };
+      const res = await addressService.createAddress(payload);
       const addr = res.data?.data;
       setAddresses((prev) => [...prev, addr]);
-      setSelectedAddress(addr.id);
+      setSelectedAddress(addr?.id);
       setShowAddressForm(false);
       toast.success('Address saved');
     } catch (err) {

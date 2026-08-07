@@ -50,19 +50,25 @@ if (file_exists(BASE_PATH . '/vendor/autoload.php')) {
 
 // PSR-4 style autoloader
 spl_autoload_register(function (string $class): void {
-    $paths = [
-        BASE_PATH . '/helpers/' . $class . '.php',
-        BASE_PATH . '/config/' . $class . '.php',
-        BASE_PATH . '/middleware/' . $class . '.php',
-        BASE_PATH . '/models/' . $class . '.php',
-        BASE_PATH . '/controllers/' . $class . '.php',
-        BASE_PATH . '/controllers/admin/' . $class . '.php',
+    $dirs = [
+        BASE_PATH . '/helpers/',
+        BASE_PATH . '/config/',
+        BASE_PATH . '/middleware/',
+        BASE_PATH . '/models/',
+        BASE_PATH . '/controllers/',
+        BASE_PATH . '/controllers/admin/',
     ];
 
-    foreach ($paths as $path) {
-        if (file_exists($path)) {
-            require_once $path;
-            return;
+    foreach ($dirs as $dir) {
+        $candidates = [
+            $dir . $class . '.php',
+            $dir . strtolower($class) . '.php',
+        ];
+        foreach ($candidates as $path) {
+            if (file_exists($path)) {
+                require_once $path;
+                return;
+            }
         }
     }
 });
@@ -88,7 +94,16 @@ $rateLimit = new RateLimitMiddleware();
 $rateLimit->handle();
 
 // Route dispatch
-$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+
+// Shared hosting (LiteSpeed) sometimes blocks PUT/PATCH/DELETE — allow override
+if ($method === 'POST') {
+    $override = strtoupper($_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] ?? '');
+    if (in_array($override, ['PUT', 'PATCH', 'DELETE'], true)) {
+        $method = $override;
+    }
+}
+
 $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 
 // Normalize known deployment prefixes (XAMPP / built-in server / subdirectory)

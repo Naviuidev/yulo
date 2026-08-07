@@ -26,7 +26,7 @@ if (file_exists($envFile)) {
     }
 }
 
-require_once $basePath . '/config/database.php';
+require_once $basePath . '/config/Database.php';
 
 $pdo = Database::getInstance();
 $hash = password_hash('Admin@123', PASSWORD_BCRYPT, ['cost' => 12]);

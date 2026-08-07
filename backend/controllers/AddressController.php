@@ -16,7 +16,7 @@ final class AddressController extends BaseController
 
     public function store(array $params = []): void
     {
-        $input = $this->getJsonInput();
+        $input = $this->normalizeAddressInput($this->getJsonInput());
         $userId = $this->authUserId();
 
         $validator = Validator::make($input)
@@ -54,13 +54,22 @@ final class AddressController extends BaseController
             'is_default' => !empty($input['is_default']) ? 1 : 0,
         ]);
 
-        Response::jsonSuccess(['id' => (int) $this->db->lastInsertId()], 'Address added.', 201);
+        $id = (int) $this->db->lastInsertId();
+        $row = $this->db->prepare('SELECT * FROM addresses WHERE id = :id LIMIT 1');
+        $row->execute(['id' => $id]);
+
+        Response::jsonSuccess($row->fetch(), 'Address added.', 201);
     }
 
     public function update(array $params): void
     {
-        $input = $this->getJsonInput();
+        $input = $this->normalizeAddressInput($this->getJsonInput());
         $userId = $this->authUserId();
+        $id = (int) ($params['id'] ?? 0);
+
+        if ($id < 1) {
+            Response::jsonError('Address not found.', 404);
+        }
 
         if (!empty($input['is_default'])) {
             $this->db->prepare('UPDATE addresses SET is_default = 0 WHERE user_id = :user_id')->execute(['user_id' => $userId]);
@@ -82,7 +91,7 @@ final class AddressController extends BaseController
             'country' => $input['country'] ?? 'India',
             'type' => $input['type'] ?? 'shipping',
             'is_default' => !empty($input['is_default']) ? 1 : 0,
-            'id' => $params['id'],
+            'id' => $id,
             'user_id' => $userId,
         ]);
 
@@ -91,6 +100,24 @@ final class AddressController extends BaseController
         }
 
         Response::jsonSuccess(null, 'Address updated.');
+    }
+
+    private function normalizeAddressInput(array $input): array
+    {
+        if (empty($input['name']) && !empty($input['full_name'])) {
+            $input['name'] = $input['full_name'];
+        }
+
+        if (!empty($input['phone'])) {
+            $digits = preg_replace('/\D+/', '', (string) $input['phone']) ?? '';
+            if (str_starts_with($digits, '91') && strlen($digits) > 10) {
+                $digits = substr($digits, 2);
+            }
+            $digits = ltrim($digits, '0');
+            $input['phone'] = substr($digits, -10);
+        }
+
+        return $input;
     }
 
     public function destroy(array $params): void

@@ -26,6 +26,7 @@ Thumbs.db
 backend/uploads/products/*
 backend/uploads/banners/*
 backend/uploads/brands/*
+backend/uploads/categories/*
 backend/uploads/invoices/*
 backend/uploads/reports/*
 !backend/uploads/**/.gitkeep

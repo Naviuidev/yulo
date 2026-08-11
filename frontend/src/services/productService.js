@@ -7,6 +7,16 @@ export const productService = {
     try {
       return await api.get(`/products${buildQueryString(params)}`);
     } catch {
+      // Homepage curated queries must not fall back to mock catalog products.
+      if (params.section || params.featured) {
+        return {
+          data: {
+            success: true,
+            data: [],
+            pagination: { total: 0, page: 1, per_page: Number(params.per_page) || 12, total_pages: 0 },
+          },
+        };
+      }
       return {
         data: {
           success: true,

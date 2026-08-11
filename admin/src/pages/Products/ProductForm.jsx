@@ -8,6 +8,7 @@ import Loader from '../../components/common/Loader';
 import productService from '../../services/productService';
 import categoryService from '../../services/categoryService';
 import brandService from '../../services/brandService';
+import homeSectionService from '../../services/homeSectionService';
 import { slugify } from '../../utils/formatters';
 import { resolveMediaUrl } from '../../utils/media';
 
@@ -23,6 +24,8 @@ const ProductForm = () => {
   const [images, setImages] = useState(EMPTY_IMAGES);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
+  const [sections, setSections] = useState([]);
+  const [sectionIds, setSectionIds] = useState([]);
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
@@ -40,12 +43,16 @@ const ProductForm = () => {
 
   useEffect(() => {
     const loadMeta = async () => {
-      const [cats, brs] = await Promise.allSettled([
+      const [cats, brs, secs] = await Promise.allSettled([
         categoryService.list({ per_page: 100 }),
         brandService.list({ per_page: 100 }),
+        homeSectionService.list(),
       ]);
       if (cats.status === 'fulfilled') setCategories(cats.value.items || []);
       if (brs.status === 'fulfilled') setBrands(brs.value.items || []);
+      if (secs.status === 'fulfilled') {
+        setSections((secs.value.items || []).filter((s) => s.status === 'active'));
+      }
     };
     loadMeta();
   }, []);
@@ -69,6 +76,7 @@ const ProductForm = () => {
           status: product.status || 'active',
           is_featured: !!product.is_featured,
         });
+        setSectionIds((product.section_ids || []).map((sid) => String(sid)));
         const loaded = (product.images || [])
           .map((img) => img.image_path || img.url || '')
           .filter(Boolean)
@@ -123,6 +131,7 @@ const ProductForm = () => {
         brand_id: data.brand_id ? Number(data.brand_id) : null,
         is_featured: !!data.is_featured,
         images: images.map((img) => img.trim()).filter(Boolean).slice(0, 3),
+        section_ids: sectionIds.map((sid) => Number(sid)).filter((sid) => sid > 0),
       };
       if (isEdit) {
         await productService.update(id, payload);
@@ -255,8 +264,32 @@ const ProductForm = () => {
               <option value="archived">Archived</option>
             </select>
           </div>
-          <div className="col-12">
-            <div className="form-check">
+          <div className="col-md-6">
+            <label className="form-label">Homepage section(s)</label>
+            <select
+              className="form-select"
+              multiple
+              size={Math.min(5, Math.max(3, sections.length || 3))}
+              value={sectionIds}
+              onChange={(e) => {
+                const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
+                setSectionIds(selected);
+              }}
+            >
+              {sections.length === 0 ? (
+                <option value="" disabled>No sections — create them under Brands → Sections UI</option>
+              ) : (
+                sections.map((s) => (
+                  <option key={s.id} value={String(s.id)}>{s.name}</option>
+                ))
+              )}
+            </select>
+            <div className="form-text">
+              Hold Cmd/Ctrl to select multiple. Product appears in those homepage sections (New Arrivals, Trending, etc.).
+            </div>
+          </div>
+          <div className="col-md-6 d-flex align-items-end">
+            <div className="form-check mb-2">
               <input type="checkbox" className="form-check-input" id="featured" {...register('is_featured')} />
               <label className="form-check-label" htmlFor="featured">Featured product</label>
             </div>

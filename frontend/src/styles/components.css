@@ -169,6 +169,31 @@
   color: var(--gray);
 }
 
+.product-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.product-card__meta .price-display {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.product-card__stock {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--gray);
+  white-space: nowrap;
+}
+
+.product-card__stock--out {
+  color: #b42318;
+}
+
 /* Navbar */
 .yulo-navbar {
   position: sticky;

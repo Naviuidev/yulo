@@ -50,6 +50,7 @@ $router->get('/cms/{slug}', [CmsController::class, 'show']);
 $router->get('/settings', [SettingsController::class, 'publicSettings']);
 $router->get('/banners', [BannerController::class, 'index']);
 $router->get('/featured-collections', [FeaturedCollectionController::class, 'index']);
+$router->get('/home-sections', [HomeSectionController::class, 'index']);
 $router->get('/offer-strips', [OfferStripController::class, 'index']);
 $router->get('/offer-card', [OfferCardController::class, 'show']);
 
@@ -175,6 +176,13 @@ $router->group('/admin', function (Router $router) use ($admin) {
     $router->post('/featured-collections', [FeaturedCollectionAdminController::class, 'store'], $admin);
     $router->put('/featured-collections/{id}', [FeaturedCollectionAdminController::class, 'update'], $admin);
     $router->delete('/featured-collections/{id}', [FeaturedCollectionAdminController::class, 'destroy'], $admin);
+
+    $router->get('/home-sections', [HomeSectionAdminController::class, 'index'], $admin);
+    $router->post('/home-sections', [HomeSectionAdminController::class, 'store'], $admin);
+    $router->put('/home-sections/flash-sale/sales-config', [HomeSectionAdminController::class, 'updateSalesConfig'], $admin);
+    $router->delete('/home-sections/flash-sale/sales-config', [HomeSectionAdminController::class, 'clearSalesConfig'], $admin);
+    $router->put('/home-sections/{id}', [HomeSectionAdminController::class, 'update'], $admin);
+    $router->delete('/home-sections/{id}', [HomeSectionAdminController::class, 'destroy'], $admin);
 
     $router->get('/offer-strips', [OfferStripAdminController::class, 'index'], $admin);
     $router->post('/offer-strips', [OfferStripAdminController::class, 'store'], $admin);

@@ -331,7 +331,7 @@ export const DOC_ITEMS = [
           { label: 'Customers', path: 'admin/src/pages/Customers/Customers.jsx, CustomerDetail.jsx' },
           { label: 'Products', path: 'admin/src/pages/Products/Products.jsx, ProductForm.jsx' },
           { label: 'Categories', path: 'admin/src/pages/Categories/Categories.jsx' },
-          { label: 'Brands', path: 'admin/src/pages/Brands/Brands.jsx' },
+          { label: 'Brands & Sections UI', path: 'admin/src/pages/Brands/Brands.jsx  →  /brands' },
           { label: 'Inventory', path: 'admin/src/pages/Inventory/Inventory.jsx' },
           { label: 'Coupons', path: 'admin/src/pages/Coupons/Coupons.jsx' },
           { label: 'Deliveries', path: 'admin/src/pages/Deliveries/Deliveries.jsx' },

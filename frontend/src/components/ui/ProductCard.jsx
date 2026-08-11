@@ -22,6 +22,13 @@ export default function ProductCard({ product, index = 0 }) {
   const inWishlist = isInWishlist(product.id);
   const inCompare = isInCompare(product.id);
   const multi = images.length > 1;
+  const isNew = Number(product.is_new) === 1;
+  const isFeatured = Number(product.is_featured) === 1;
+  const salePrice = product.sale_price != null && product.sale_price !== ''
+    ? Number(product.sale_price)
+    : null;
+  const hasSale = salePrice != null && !Number.isNaN(salePrice) && salePrice > 0 && salePrice < Number(product.price);
+  const stock = Number(product.stock ?? 0);
 
   const stop = (e) => {
     e.preventDefault();
@@ -37,9 +44,9 @@ export default function ProductCard({ product, index = 0 }) {
       transition={{ delay: Math.min(index * 0.05, 0.3) }}
     >
       <div className="product-card__image-wrap">
-        {product.is_new && <ProductBadge type="new" />}
-        {product.sale_price && <ProductBadge type="sale" />}
-        {product.is_featured && !product.sale_price && !product.is_new && <ProductBadge type="featured" />}
+        {isNew ? <ProductBadge type="new" /> : null}
+        {hasSale ? <ProductBadge type="sale" /> : null}
+        {isFeatured && !hasSale && !isNew ? <ProductBadge type="featured" /> : null}
 
         {multi ? (
           <Swiper
@@ -116,10 +123,15 @@ export default function ProductCard({ product, index = 0 }) {
           <div className="product-card__brand">{product.brand_name}</div>
         )}
         <h3 className="product-card__name">{product.name}</h3>
-        {product.average_rating > 0 && (
+        {Number(product.average_rating) > 0 ? (
           <RatingStars rating={product.average_rating} showValue />
-        )}
-        <PriceDisplay price={product.price} salePrice={product.sale_price} />
+        ) : null}
+        <div className="product-card__meta">
+          <PriceDisplay price={product.price} salePrice={hasSale ? salePrice : null} />
+          <span className={`product-card__stock ${stock > 0 ? '' : 'product-card__stock--out'}`}>
+            {stock > 0 ? `${stock} available` : 'Out of stock'}
+          </span>
+        </div>
       </Link>
     </motion.div>
   );

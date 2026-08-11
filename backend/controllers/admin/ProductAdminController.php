@@ -55,6 +55,7 @@ final class ProductAdminController extends BaseController
 
         $product['images'] = $productModel->getImages((int) $product['id']);
         $product['variants'] = $productModel->getVariants((int) $product['id']);
+        $product['section_ids'] = $this->getSectionIds((int) $product['id']);
 
         Response::jsonSuccess($product);
     }
@@ -89,6 +90,7 @@ final class ProductAdminController extends BaseController
 
         $productId = (int) $this->db->lastInsertId();
         $this->syncImages($productId, $input['images'] ?? []);
+        $this->syncSections($productId, $input['section_ids'] ?? []);
 
         Response::jsonSuccess(['id' => $productId], 'Product created.', 201);
     }
@@ -121,6 +123,10 @@ final class ProductAdminController extends BaseController
 
         if (array_key_exists('images', $input)) {
             $this->syncImages($productId, $input['images'] ?? []);
+        }
+
+        if (array_key_exists('section_ids', $input)) {
+            $this->syncSections($productId, $input['section_ids'] ?? []);
         }
 
         Response::jsonSuccess(null, 'Product updated.');
@@ -191,6 +197,48 @@ final class ProductAdminController extends BaseController
         }
     }
 
+    /** @return list<int> */
+    private function getSectionIds(int $productId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT section_id FROM product_home_sections WHERE product_id = :product_id'
+        );
+        $stmt->execute(['product_id' => $productId]);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    private function syncSections(int $productId, mixed $sectionIds): void
+    {
+        $this->db->prepare('DELETE FROM product_home_sections WHERE product_id = :id')
+            ->execute(['id' => $productId]);
+
+        if (!is_array($sectionIds) || $sectionIds === []) {
+            return;
+        }
+
+        $ids = [];
+        foreach ($sectionIds as $sid) {
+            $id = (int) $sid;
+            if ($id > 0) {
+                $ids[$id] = true;
+            }
+        }
+
+        if ($ids === []) {
+            return;
+        }
+
+        $stmt = $this->db->prepare(
+            'INSERT INTO product_home_sections (product_id, section_id) VALUES (:product_id, :section_id)'
+        );
+        foreach (array_keys($ids) as $sectionId) {
+            $stmt->execute([
+                'product_id' => $productId,
+                'section_id' => $sectionId,
+            ]);
+        }
+    }
+
     public function destroy(array $params): void
     {
         $id = (int) ($params['id'] ?? 0);
@@ -205,6 +253,7 @@ final class ProductAdminController extends BaseController
         $related = [
             'product_images',
             'product_variants',
+            'product_home_sections',
             'cart_items',
             'wishlists',
             'compare_lists',

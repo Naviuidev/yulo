@@ -98,6 +98,17 @@ final class Product
             $where[] = 'p.is_bestseller = 1';
         }
 
+        if (!empty($filters['section'])) {
+            $where[] = 'EXISTS (
+                SELECT 1 FROM product_home_sections phs
+                INNER JOIN home_sections hs ON hs.id = phs.section_id
+                WHERE phs.product_id = p.id
+                  AND hs.slug = :section_slug
+                  AND hs.status = \'active\'
+            )';
+            $params['section_slug'] = $filters['section'];
+        }
+
         $orderBy = match ($filters['sort'] ?? 'newest') {
             'price_asc' => 'COALESCE(p.sale_price, p.price) ASC',
             'price_desc' => 'COALESCE(p.sale_price, p.price) DESC',

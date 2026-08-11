@@ -29,6 +29,7 @@ final class ProductController extends BaseController
             'is_new' => isset($_GET['is_new']),
             'is_trending' => isset($_GET['is_trending']),
             'is_bestseller' => isset($_GET['is_bestseller']),
+            'section' => $_GET['section'] ?? null,
             'sort' => $_GET['sort'] ?? 'newest',
         ];
 

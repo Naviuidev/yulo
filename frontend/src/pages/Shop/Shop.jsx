@@ -30,6 +30,7 @@ export default function Shop() {
     rating: searchParams.get('rating') || '',
     page: searchParams.get('page') || '1',
     featured: searchParams.get('featured') || '',
+    section: searchParams.get('section') || '',
   };
 
   const updateFilter = (key, value) => {

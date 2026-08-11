@@ -120,6 +120,31 @@ CREATE TABLE IF NOT EXISTS product_images (
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- Homepage product sections (New Arrivals, Trending, etc.)
+CREATE TABLE IF NOT EXISTS home_sections (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    description VARCHAR(500) NULL,
+    sale_start_date DATE NULL,
+    sale_end_date DATE NULL,
+    sale_start_time TIME NULL,
+    sale_end_time TIME NULL,
+    sort_order INT DEFAULT 0,
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    is_locked TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS product_home_sections (
+    product_id INT UNSIGNED NOT NULL,
+    section_id INT UNSIGNED NOT NULL,
+    PRIMARY KEY (product_id, section_id),
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (section_id) REFERENCES home_sections(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 -- Product variants
 CREATE TABLE IF NOT EXISTS product_variants (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

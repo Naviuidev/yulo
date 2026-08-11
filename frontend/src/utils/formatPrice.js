@@ -14,6 +14,9 @@ export function getEffectivePrice(product) {
 }
 
 export function getDiscountPercent(price, salePrice) {
-  if (!price || !salePrice || salePrice >= price) return 0;
-  return Math.round(((price - salePrice) / price) * 100);
+  const regular = Number(price);
+  const sale = Number(salePrice);
+  if (!regular || !sale || sale >= regular) return 0;
+  // Small discounts (e.g. ₹1000 → ₹999) would round to 0%; show at least 1%.
+  return Math.max(1, Math.round(((regular - sale) / regular) * 100));
 }

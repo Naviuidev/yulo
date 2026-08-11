@@ -50,7 +50,7 @@ export const NAV_ITEMS = [
   { path: '/customers', icon: 'bi-people', label: 'Customers' },
   { path: '/products', icon: 'bi-box-seam', label: 'Products' },
   { path: '/categories', icon: 'bi-tags', label: 'Categories' },
-  { path: '/brands', icon: 'bi-award', label: 'Brands' },
+  { path: '/brands', icon: 'bi-award', label: 'Brands & Sections' },
   { path: '/inventory', icon: 'bi-boxes', label: 'Inventory' },
   { path: '/coupons', icon: 'bi-ticket-perforated', label: 'Coupons' },
   { path: '/deliveries', icon: 'bi-truck', label: 'Deliveries' },

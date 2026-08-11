@@ -3,14 +3,15 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, EffectFade, Autoplay } from 'swiper/modules';
-import { BRAND_NAME, BRAND_TAGLINE, HERO_IMAGE } from '../../utils/constants';
+import { BRAND_NAME, HERO_IMAGE } from '../../utils/constants';
 import { resolveMediaUrl } from '../../utils/helpers';
 import Button from '../../components/ui/Button';
-import YuloLogo from '../../components/common/YuloLogo';
 import api from '../../services/api';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/effect-fade';
+
+const HERO_CATCHLINE = 'Style that turns heads.';
 
 export default function HeroBanner() {
   const [slides, setSlides] = useState([HERO_IMAGE]);
@@ -88,17 +89,16 @@ export default function HeroBanner() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: 'easeOut' }}
       >
-        <motion.div
-          className="hero-banner__logo-wrap"
-          initial={{ scale: 0.8, opacity: 0 }}
+        <motion.h1
+          className="hero-banner__brand"
+          initial={{ scale: 0.92, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
+          transition={{ delay: 0.15, duration: 0.6 }}
         >
-          <YuloLogo variant="light" className="hero-banner__logo" />
-        </motion.div>
-        <h1 className="visually-hidden">{BRAND_NAME}</h1>
+          {BRAND_NAME}
+        </motion.h1>
+        <p className="hero-banner__catchline">{HERO_CATCHLINE}</p>
         <div className="hero-banner__gold-line" />
-        <p className="hero-banner__tagline">{BRAND_TAGLINE}</p>
         <div className="hero-banner__cta">
           <Link to="/shop">
             <Button variant="white">Shop Collection</Button>

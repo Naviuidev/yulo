@@ -11,8 +11,6 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/effect-fade';
 
-const HERO_CATCHLINE = 'Style that turns heads.';
-
 export default function HeroBanner() {
   const [slides, setSlides] = useState([HERO_IMAGE]);
 
@@ -85,19 +83,19 @@ export default function HeroBanner() {
       <div className="hero-banner__overlay" />
       <motion.div
         className="hero-banner__content"
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 28 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: 'easeOut' }}
       >
         <motion.h1
-          className="hero-banner__brand"
-          initial={{ scale: 0.92, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
+          className="hero-banner__tagline"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15, duration: 0.6 }}
         >
-          {BRAND_NAME}
+          <span className="visually-hidden">{BRAND_NAME}</span>
+          Wear <span className="hero-banner__tagline-brand">YULO</span>, Look Awesome
         </motion.h1>
-        <p className="hero-banner__catchline">{HERO_CATCHLINE}</p>
         <div className="hero-banner__gold-line" />
         <div className="hero-banner__cta">
           <Link to="/shop">

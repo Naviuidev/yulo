@@ -142,7 +142,14 @@ const ProductForm = () => {
       }
       navigate('/products');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Save failed');
+      const data = err.response?.data;
+      const fieldErrors = data?.errors;
+      let detail = data?.message || 'Save failed';
+      if (fieldErrors && typeof fieldErrors === 'object') {
+        const first = Object.values(fieldErrors).flat().find(Boolean);
+        if (first) detail = String(first);
+      }
+      toast.error(detail);
     } finally {
       setSaving(false);
     }

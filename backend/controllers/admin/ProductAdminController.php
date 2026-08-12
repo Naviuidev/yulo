@@ -62,74 +62,112 @@ final class ProductAdminController extends BaseController
 
     public function store(array $params = []): void
     {
-        $input = $this->getJsonInput();
+        $input = $this->normalizeProductInput($this->getJsonInput());
 
         $validator = Validator::make($input)->required('name')->required('slug')->required('price')->numeric('price');
         if ($validator->fails()) {
             Response::jsonError('Validation failed.', 422, $validator->errors());
         }
 
-        $stmt = $this->db->prepare(
-            'INSERT INTO products (name, slug, description, short_description, sku, price, sale_price, stock, category_id, brand_id, status, is_featured, created_at, updated_at)
-             VALUES (:name, :slug, :description, :short_description, :sku, :price, :sale_price, :stock, :category_id, :brand_id, :status, :is_featured, NOW(), NOW())'
-        );
-        $stmt->execute([
-            'name' => $input['name'],
-            'slug' => $input['slug'],
-            'description' => $input['description'] ?? null,
-            'short_description' => $input['short_description'] ?? null,
-            'sku' => $input['sku'] ?? null,
-            'price' => $input['price'],
-            'sale_price' => $input['sale_price'] ?? null,
-            'stock' => $input['stock'] ?? 0,
-            'category_id' => $input['category_id'] ?? null,
-            'brand_id' => $input['brand_id'] ?? null,
-            'status' => $input['status'] ?? 'active',
-            'is_featured' => !empty($input['is_featured']) ? 1 : 0,
-        ]);
+        if ($this->slugExists((string) $input['slug'])) {
+            Response::jsonError('Validation failed.', 422, ['slug' => ['Slug already exists.']]);
+        }
 
-        $productId = (int) $this->db->lastInsertId();
-        $this->syncImages($productId, $input['images'] ?? []);
-        $this->syncSections($productId, $input['section_ids'] ?? []);
+        SchemaGuard::ensureHomeSections($this->db);
 
-        Response::jsonSuccess(['id' => $productId], 'Product created.', 201);
+        try {
+            $this->db->beginTransaction();
+
+            $stmt = $this->db->prepare(
+                'INSERT INTO products (name, slug, description, short_description, sku, price, sale_price, stock, category_id, brand_id, status, is_featured, created_at, updated_at)
+                 VALUES (:name, :slug, :description, :short_description, :sku, :price, :sale_price, :stock, :category_id, :brand_id, :status, :is_featured, NOW(), NOW())'
+            );
+            $stmt->execute([
+                'name' => $input['name'],
+                'slug' => $input['slug'],
+                'description' => $input['description'],
+                'short_description' => $input['short_description'],
+                'sku' => $input['sku'],
+                'price' => $input['price'],
+                'sale_price' => $input['sale_price'],
+                'stock' => $input['stock'],
+                'category_id' => $input['category_id'],
+                'brand_id' => $input['brand_id'],
+                'status' => $input['status'],
+                'is_featured' => $input['is_featured'],
+            ]);
+
+            $productId = (int) $this->db->lastInsertId();
+            $this->syncImages($productId, $input['images'] ?? []);
+            $this->syncSections($productId, $input['section_ids'] ?? []);
+
+            $this->db->commit();
+            Response::jsonSuccess(['id' => $productId], 'Product created.', 201);
+        } catch (PDOException $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            $this->handleProductDbError($e);
+        }
     }
 
     public function update(array $params): void
     {
-        $input = $this->getJsonInput();
+        $input = $this->normalizeProductInput($this->getJsonInput());
         $productId = (int) $params['id'];
 
-        $stmt = $this->db->prepare(
-            'UPDATE products SET name = :name, slug = :slug, description = :description, short_description = :short_description,
-             sku = :sku, price = :price, sale_price = :sale_price, stock = :stock, category_id = :category_id, brand_id = :brand_id,
-             status = :status, is_featured = :is_featured, updated_at = NOW() WHERE id = :id'
-        );
-        $stmt->execute([
-            'name' => $input['name'],
-            'slug' => $input['slug'],
-            'description' => $input['description'] ?? null,
-            'short_description' => $input['short_description'] ?? null,
-            'sku' => $input['sku'] ?? null,
-            'price' => $input['price'],
-            'sale_price' => $input['sale_price'] ?? null,
-            'stock' => $input['stock'] ?? 0,
-            'category_id' => $input['category_id'] ?? null,
-            'brand_id' => $input['brand_id'] ?? null,
-            'status' => $input['status'] ?? 'active',
-            'is_featured' => !empty($input['is_featured']) ? 1 : 0,
-            'id' => $productId,
-        ]);
-
-        if (array_key_exists('images', $input)) {
-            $this->syncImages($productId, $input['images'] ?? []);
+        $exists = $this->db->prepare('SELECT id FROM products WHERE id = :id LIMIT 1');
+        $exists->execute(['id' => $productId]);
+        if (!$exists->fetch()) {
+            Response::jsonError('Product not found.', 404);
         }
 
-        if (array_key_exists('section_ids', $input)) {
-            $this->syncSections($productId, $input['section_ids'] ?? []);
+        if ($this->slugExists((string) $input['slug'], $productId)) {
+            Response::jsonError('Validation failed.', 422, ['slug' => ['Slug already exists.']]);
         }
 
-        Response::jsonSuccess(null, 'Product updated.');
+        SchemaGuard::ensureHomeSections($this->db);
+
+        try {
+            $this->db->beginTransaction();
+
+            $stmt = $this->db->prepare(
+                'UPDATE products SET name = :name, slug = :slug, description = :description, short_description = :short_description,
+                 sku = :sku, price = :price, sale_price = :sale_price, stock = :stock, category_id = :category_id, brand_id = :brand_id,
+                 status = :status, is_featured = :is_featured, updated_at = NOW() WHERE id = :id'
+            );
+            $stmt->execute([
+                'name' => $input['name'],
+                'slug' => $input['slug'],
+                'description' => $input['description'],
+                'short_description' => $input['short_description'],
+                'sku' => $input['sku'],
+                'price' => $input['price'],
+                'sale_price' => $input['sale_price'],
+                'stock' => $input['stock'],
+                'category_id' => $input['category_id'],
+                'brand_id' => $input['brand_id'],
+                'status' => $input['status'],
+                'is_featured' => $input['is_featured'],
+                'id' => $productId,
+            ]);
+
+            if (array_key_exists('images', $input)) {
+                $this->syncImages($productId, $input['images'] ?? []);
+            }
+
+            if (array_key_exists('section_ids', $input)) {
+                $this->syncSections($productId, $input['section_ids'] ?? []);
+            }
+
+            $this->db->commit();
+            Response::jsonSuccess(null, 'Product updated.');
+        } catch (PDOException $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            $this->handleProductDbError($e);
+        }
     }
 
     public function uploadImage(array $params = []): void
@@ -200,15 +238,22 @@ final class ProductAdminController extends BaseController
     /** @return list<int> */
     private function getSectionIds(int $productId): array
     {
-        $stmt = $this->db->prepare(
-            'SELECT section_id FROM product_home_sections WHERE product_id = :product_id'
-        );
-        $stmt->execute(['product_id' => $productId]);
-        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        try {
+            SchemaGuard::ensureHomeSections($this->db);
+            $stmt = $this->db->prepare(
+                'SELECT section_id FROM product_home_sections WHERE product_id = :product_id'
+            );
+            $stmt->execute(['product_id' => $productId]);
+            return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        } catch (Throwable) {
+            return [];
+        }
     }
 
     private function syncSections(int $productId, mixed $sectionIds): void
     {
+        SchemaGuard::ensureHomeSections($this->db);
+
         $this->db->prepare('DELETE FROM product_home_sections WHERE product_id = :id')
             ->execute(['id' => $productId]);
 
@@ -228,10 +273,20 @@ final class ProductAdminController extends BaseController
             return;
         }
 
+        // Keep only section IDs that still exist (avoids FK 500s from stale admin UI state).
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $check = $this->db->prepare("SELECT id FROM home_sections WHERE id IN ({$placeholders})");
+        $check->execute(array_keys($ids));
+        $validIds = array_map('intval', $check->fetchAll(PDO::FETCH_COLUMN));
+
+        if ($validIds === []) {
+            return;
+        }
+
         $stmt = $this->db->prepare(
             'INSERT INTO product_home_sections (product_id, section_id) VALUES (:product_id, :section_id)'
         );
-        foreach (array_keys($ids) as $sectionId) {
+        foreach ($validIds as $sectionId) {
             $stmt->execute([
                 'product_id' => $productId,
                 'section_id' => $sectionId,
@@ -249,7 +304,8 @@ final class ProductAdminController extends BaseController
             Response::jsonError('Product not found.', 404);
         }
 
-        // Permanently remove related rows, then the product (not soft-inactive/archived)
+        SchemaGuard::ensureHomeSections($this->db);
+
         $related = [
             'product_images',
             'product_variants',
@@ -263,10 +319,13 @@ final class ProductAdminController extends BaseController
         ];
 
         foreach ($related as $table) {
-            $this->db->prepare("DELETE FROM {$table} WHERE product_id = :id")->execute(['id' => $id]);
+            try {
+                $this->db->prepare("DELETE FROM {$table} WHERE product_id = :id")->execute(['id' => $id]);
+            } catch (PDOException) {
+                // Table may not exist on older deployments.
+            }
         }
 
-        // order_items retain price/qty; FK would block delete, so relax briefly
         $this->db->exec('SET FOREIGN_KEY_CHECKS=0');
         $this->db->prepare('DELETE FROM products WHERE id = :id')->execute(['id' => $id]);
         $this->db->exec('SET FOREIGN_KEY_CHECKS=1');
@@ -319,5 +378,101 @@ final class ProductAdminController extends BaseController
 
         fclose($handle);
         Response::jsonSuccess(['imported' => $imported, 'errors' => $errors], 'Bulk upload completed.');
+    }
+
+    private function normalizeProductInput(array $input): array
+    {
+        $short = isset($input['short_description']) ? trim((string) $input['short_description']) : '';
+        if (mb_strlen($short) > 500) {
+            $short = mb_substr($short, 0, 500);
+        }
+
+        $status = (string) ($input['status'] ?? 'active');
+        if (!in_array($status, ['active', 'inactive', 'archived'], true)) {
+            $status = 'active';
+        }
+
+        return [
+            'name' => trim((string) ($input['name'] ?? '')),
+            'slug' => trim((string) ($input['slug'] ?? '')),
+            'description' => $this->nullableString($input['description'] ?? null),
+            'short_description' => $short !== '' ? $short : null,
+            'sku' => $this->nullableString($input['sku'] ?? null),
+            'price' => $input['price'] ?? null,
+            'sale_price' => $this->nullableNumber($input['sale_price'] ?? null),
+            'stock' => (int) ($input['stock'] ?? 0),
+            'category_id' => $this->nullableInt($input['category_id'] ?? null),
+            'brand_id' => $this->nullableInt($input['brand_id'] ?? null),
+            'status' => $status,
+            'is_featured' => !empty($input['is_featured']) ? 1 : 0,
+            'images' => $input['images'] ?? [],
+            'section_ids' => $input['section_ids'] ?? [],
+        ];
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $trimmed = trim((string) $value);
+        return $trimmed === '' ? null : $trimmed;
+    }
+
+    private function nullableInt(mixed $value): ?int
+    {
+        if ($value === null || $value === '' || $value === false) {
+            return null;
+        }
+        $id = (int) $value;
+        return $id > 0 ? $id : null;
+    }
+
+    private function nullableNumber(mixed $value): ?float
+    {
+        if ($value === null || $value === '' || $value === false) {
+            return null;
+        }
+        return (float) $value;
+    }
+
+    private function slugExists(string $slug, ?int $excludeId = null): bool
+    {
+        if ($slug === '') {
+            return false;
+        }
+
+        if ($excludeId) {
+            $stmt = $this->db->prepare('SELECT id FROM products WHERE slug = :slug AND id != :id LIMIT 1');
+            $stmt->execute(['slug' => $slug, 'id' => $excludeId]);
+        } else {
+            $stmt = $this->db->prepare('SELECT id FROM products WHERE slug = :slug LIMIT 1');
+            $stmt->execute(['slug' => $slug]);
+        }
+
+        return (bool) $stmt->fetch();
+    }
+
+    private function handleProductDbError(PDOException $e): void
+    {
+        $sqlState = (string) ($e->errorInfo[0] ?? '');
+        $message = $e->getMessage();
+        error_log('Product save failed: ' . $message);
+
+        if ($sqlState === '23000') {
+            if (str_contains($message, 'slug') || str_contains($message, 'Duplicate')) {
+                Response::jsonError('Validation failed.', 422, ['slug' => ['Slug already exists.']]);
+            }
+            Response::jsonError('Could not save product. Check category, brand, and section selections.', 422);
+        }
+
+        if ($sqlState === '42S02' || str_contains($message, "doesn't exist")) {
+            Response::jsonError(
+                'Database is missing required tables. Import backend/database/home_sections.sql on production.',
+                500
+            );
+        }
+
+        throw $e;
     }
 }

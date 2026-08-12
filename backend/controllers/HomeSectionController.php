@@ -9,6 +9,8 @@ final class HomeSectionController extends BaseController
     /** Public active homepage sections (includes Flash Sale schedule). */
     public function index(array $params = []): void
     {
+        SchemaGuard::ensureHomeSections($this->db);
+
         $stmt = $this->db->query(
             'SELECT id, name, slug, description, sort_order,
                     sale_start_date, sale_end_date, sale_start_time, sale_end_time

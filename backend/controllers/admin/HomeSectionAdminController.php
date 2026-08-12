@@ -10,6 +10,8 @@ final class HomeSectionAdminController extends BaseController
 
     public function index(array $params = []): void
     {
+        SchemaGuard::ensureHomeSections($this->db);
+
         $stmt = $this->db->query(
             'SELECT s.*,
                     (SELECT COUNT(*) FROM product_home_sections phs WHERE phs.section_id = s.id) AS product_count

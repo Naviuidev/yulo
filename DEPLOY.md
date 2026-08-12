@@ -264,3 +264,5 @@ cd admin && npm run dev
 | CORS error | Check `CORS_ALLOWED_ORIGINS` includes your live domains |
 | OTP not sending | Check Gmail app password in API `.env` |
 | Images not showing | Make sure `uploads` folder is writable |
+| Admin “Internal server error” when adding products | Deploy latest API code. Also import `backend/database/home_sections.sql` in phpMyAdmin if `home_sections` / `product_home_sections` are missing. Ensure `uploads` is writable (`chmod -R 775 uploads`). Use a unique product slug. |
+| Product image upload fails | `chmod -R 775 uploads` on the API folder; confirm PHP `fileinfo` is enabled |

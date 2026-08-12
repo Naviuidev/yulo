@@ -22,6 +22,18 @@ final class Uploader
             return ['success' => false, 'message' => 'File exceeds maximum upload size.'];
         }
 
+        $targetDir = rtrim($this->config['path'], '/') . '/' . trim($subfolder, '/');
+        if (!is_dir($targetDir) && !mkdir($targetDir, 0755, true) && !is_dir($targetDir)) {
+            return ['success' => false, 'message' => 'Upload directory could not be created. Check uploads permissions.'];
+        }
+        if (!is_writable($targetDir)) {
+            return ['success' => false, 'message' => 'Upload directory is not writable. Run chmod -R 775 uploads on the API server.'];
+        }
+
+        if (!class_exists('finfo')) {
+            return ['success' => false, 'message' => 'PHP fileinfo extension is required for uploads.'];
+        }
+
         $finfo = new finfo(FILEINFO_MIME_TYPE);
         $mime = $finfo->file($file['tmp_name']) ?: '';
 
@@ -32,11 +44,6 @@ final class Uploader
         $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
         if (!in_array($extension, $this->config['allowed_extensions'], true)) {
             return ['success' => false, 'message' => 'File extension not allowed.'];
-        }
-
-        $targetDir = rtrim($this->config['path'], '/') . '/' . trim($subfolder, '/');
-        if (!is_dir($targetDir)) {
-            mkdir($targetDir, 0755, true);
         }
 
         $filename = bin2hex(random_bytes(16)) . '.' . $extension;

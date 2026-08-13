@@ -22,13 +22,18 @@ final class CartController extends BaseController
 
         $subtotal = 0;
         foreach ($items as &$item) {
-            $price = $item['variant_id']
-                ? ($item['variant_sale_price'] ?? $item['variant_price'])
-                : ($item['sale_price'] ?? $item['price']);
-            $item['unit_price'] = (float) $price;
-            $item['line_total'] = (float) $price * (int) $item['quantity'];
+            $regular = !empty($item['variant_id'])
+                ? (float) ($item['variant_price'] ?? $item['price'] ?? 0)
+                : (float) ($item['price'] ?? 0);
+            $payable = Pricing::unitPriceFromItem($item);
+            $item['regular_price'] = $regular;
+            $item['unit_price'] = $payable;
+            // Payable unit amount for storefront (must be sale price when set).
+            $item['price'] = $payable;
+            $item['line_total'] = $payable * (int) $item['quantity'];
             $subtotal += $item['line_total'];
         }
+        unset($item);
 
         Response::jsonSuccess([
             'cart_id' => $cartId,
@@ -61,7 +66,10 @@ final class CartController extends BaseController
         }
 
         $variantId = !empty($input['variant_id']) ? (int) $input['variant_id'] : null;
-        $price = $product['sale_price'] ?? $product['price'];
+        $price = Pricing::effective(
+            isset($product['sale_price']) ? (float) $product['sale_price'] : null,
+            (float) $product['price']
+        );
 
         if ($variantId) {
             $vStmt = $this->db->prepare('SELECT id, stock, price, sale_price FROM product_variants WHERE id = :id AND product_id = :product_id LIMIT 1');
@@ -70,7 +78,10 @@ final class CartController extends BaseController
             if (!$variant) {
                 Response::jsonError('Variant not found.', 404);
             }
-            $price = $variant['sale_price'] ?? $variant['price'];
+            $price = Pricing::effective(
+                isset($variant['sale_price']) ? (float) $variant['sale_price'] : null,
+                (float) $variant['price']
+            );
         }
 
         $checkStmt = $this->db->prepare(

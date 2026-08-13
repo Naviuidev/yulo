@@ -15,10 +15,7 @@ final class CheckoutController extends BaseController
 
         $subtotal = 0;
         foreach ($items as $item) {
-            $price = $item['variant_id']
-                ? ($item['variant_sale_price'] ?? $item['variant_price'])
-                : ($item['sale_price'] ?? $item['price']);
-            $subtotal += (float) $price * (int) $item['quantity'];
+            $subtotal += Pricing::unitPriceFromItem($item) * (int) $item['quantity'];
         }
 
         $shipping = $subtotal >= 999 ? 0 : 49;
@@ -85,11 +82,7 @@ final class CheckoutController extends BaseController
 
         $subtotal = 0.0;
         foreach ($items as $item) {
-            $variantId = !empty($item['variant_id']) ? (int) $item['variant_id'] : null;
-            $price = $variantId
-                ? ($item['variant_sale_price'] ?? $item['variant_price'] ?? $item['sale_price'] ?? $item['price'])
-                : ($item['sale_price'] ?? $item['price']);
-            $subtotal += (float) $price * (int) $item['quantity'];
+            $subtotal += Pricing::unitPriceFromItem($item) * (int) $item['quantity'];
         }
 
         $discount = 0.0;
@@ -151,10 +144,8 @@ final class CheckoutController extends BaseController
 
             foreach ($items as $item) {
                 $variantId = !empty($item['variant_id']) ? (int) $item['variant_id'] : null;
-                $price = $variantId
-                    ? ($item['variant_sale_price'] ?? $item['variant_price'] ?? $item['sale_price'] ?? $item['price'])
-                    : ($item['sale_price'] ?? $item['price']);
-                $lineTotal = (float) $price * (int) $item['quantity'];
+                $price = Pricing::unitPriceFromItem($item);
+                $lineTotal = $price * (int) $item['quantity'];
 
                 $itemStmt->execute([
                     'order_id' => $orderId,
@@ -411,7 +402,10 @@ final class CheckoutController extends BaseController
                 Response::jsonError('One or more items are unavailable.', 422);
             }
 
-            $price = (float) ($row['sale_price'] ?? $row['price']);
+            $price = Pricing::effective(
+                isset($row['sale_price']) ? (float) $row['sale_price'] : null,
+                (float) $row['price']
+            );
             $subtotal += $price * $qty;
             $lineItems[] = [
                 'product_id' => $productId,

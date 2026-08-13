@@ -87,11 +87,7 @@ final class OrderController extends BaseController
 
         $subtotal = 0;
         foreach ($items as $item) {
-            $variantId = !empty($item['variant_id']) ? (int) $item['variant_id'] : null;
-            $price = $variantId
-                ? ($item['variant_sale_price'] ?? $item['variant_price'] ?? $item['sale_price'] ?? $item['price'])
-                : ($item['sale_price'] ?? $item['price']);
-            $subtotal += (float) $price * (int) $item['quantity'];
+            $subtotal += Pricing::unitPriceFromItem($item) * (int) $item['quantity'];
         }
 
         $discount = 0;
@@ -158,10 +154,8 @@ final class OrderController extends BaseController
 
             foreach ($items as $item) {
                 $variantId = !empty($item['variant_id']) ? (int) $item['variant_id'] : null;
-                $price = $variantId
-                    ? ($item['variant_sale_price'] ?? $item['variant_price'] ?? $item['sale_price'] ?? $item['price'])
-                    : ($item['sale_price'] ?? $item['price']);
-                $lineTotal = (float) $price * (int) $item['quantity'];
+                $price = Pricing::unitPriceFromItem($item);
+                $lineTotal = $price * (int) $item['quantity'];
 
                 $itemStmt->execute([
                     'order_id' => $orderId,

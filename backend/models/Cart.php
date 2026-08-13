@@ -25,10 +25,13 @@ final class Cart
 
     public function getItems(int $cartId): array
     {
+        // Alias columns so p.price does not overwrite cart_items.price (ci.*).
         $stmt = $this->db->prepare(
-            'SELECT ci.*, p.name, p.slug, p.price, p.sale_price, p.stock,
-                    pv.name as variant_name, pv.price as variant_price, pv.sale_price as variant_sale_price,
-                    (SELECT image_path FROM product_images WHERE product_id = p.id AND is_primary = 1 LIMIT 1) as image
+            'SELECT ci.id, ci.cart_id, ci.product_id, ci.variant_id, ci.quantity,
+                    ci.price AS cart_price, ci.created_at, ci.updated_at,
+                    p.name, p.slug, p.price, p.sale_price, p.stock,
+                    pv.name AS variant_name, pv.price AS variant_price, pv.sale_price AS variant_sale_price,
+                    (SELECT image_path FROM product_images WHERE product_id = p.id AND is_primary = 1 LIMIT 1) AS image
              FROM cart_items ci
              JOIN products p ON p.id = ci.product_id
              LEFT JOIN product_variants pv ON pv.id = ci.variant_id

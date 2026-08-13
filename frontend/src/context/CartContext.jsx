@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import { cartService } from '../services/cartService';
+import { getCartItemUnitPrice, getEffectivePrice } from '../utils/formatPrice';
 import { getStoredJson, setStoredJson } from '../utils/helpers';
 import { AuthContext } from './AuthContext';
 
@@ -69,7 +70,9 @@ export function CartProvider({ children }) {
               product_id: product.id,
               name: product.name,
               slug: product.slug,
-              price: product.sale_price ?? product.price,
+              price: getEffectivePrice(product),
+              sale_price: product.sale_price,
+              regular_price: product.price,
               quantity,
               variant_id,
               size,
@@ -133,7 +136,7 @@ export function CartProvider({ children }) {
   );
 
   const subtotal = useMemo(
-    () => items.reduce((sum, i) => sum + (i.price ?? i.unit_price ?? 0) * (i.quantity ?? 1), 0),
+    () => items.reduce((sum, i) => sum + getCartItemUnitPrice(i) * (i.quantity ?? 1), 0),
     [items]
   );
 

@@ -8,7 +8,7 @@ import Modal from '../../components/ui/Modal';
 import AddressForm from '../../components/forms/AddressForm';
 import useCart from '../../hooks/useCart';
 import useAuth from '../../hooks/useAuth';
-import { formatPrice } from '../../utils/formatPrice';
+import { formatPrice, getCartItemUnitPrice } from '../../utils/formatPrice';
 import { couponService, orderService } from '../../services/orderService';
 import { addressService } from '../../services/contentService';
 import { openCashfreeCheckout } from '../../utils/cashfreeCheckout';
@@ -45,7 +45,10 @@ export default function Checkout() {
   const [editingAddress, setEditingAddress] = useState(null);
 
   const shipping = subtotal >= 999 ? 0 : 99;
-  const total = Math.max(0, subtotal + shipping - discount);
+  // Match backend Cashfree total: sale subtotal − discount + shipping + 18% GST.
+  const taxable = Math.max(0, subtotal - discount);
+  const tax = Math.round(taxable * 0.18 * 100) / 100;
+  const total = Math.max(0, Math.round((taxable + shipping + tax) * 100) / 100);
 
   const selectedAddress = useMemo(
     () => addresses.find((a) => Number(a.id) === Number(selectedAddressId)) || null,
@@ -267,14 +270,17 @@ export default function Checkout() {
           <div className="col-lg-5">
             <div className="border p-4 sticky-top" style={{ top: 100 }}>
               <h5 className="text-uppercase small fw-semibold mb-4">Order Summary</h5>
-              {items.map((item) => (
-                <div key={item.id} className="d-flex justify-content-between small mb-2">
-                  <span>
-                    {item.name} × {item.quantity}
-                  </span>
-                  <span>{formatPrice((item.price ?? item.unit_price) * item.quantity)}</span>
-                </div>
-              ))}
+              {items.map((item) => {
+                const unit = getCartItemUnitPrice(item);
+                return (
+                  <div key={item.id} className="d-flex justify-content-between small mb-2">
+                    <span>
+                      {item.name} × {item.quantity}
+                    </span>
+                    <span>{formatPrice(unit * item.quantity, 'INR', 2)}</span>
+                  </div>
+                );
+              })}
               <hr />
               <div className="d-flex gap-2 mb-3">
                 <input
@@ -289,22 +295,26 @@ export default function Checkout() {
               </div>
               <div className="d-flex justify-content-between mb-2">
                 <span>Subtotal</span>
-                <span>{formatPrice(subtotal)}</span>
+                <span>{formatPrice(subtotal, 'INR', 2)}</span>
               </div>
               {discount > 0 && (
                 <div className="d-flex justify-content-between mb-2 text-success">
                   <span>Discount</span>
-                  <span>-{formatPrice(discount)}</span>
+                  <span>-{formatPrice(discount, 'INR', 2)}</span>
                 </div>
               )}
               <div className="d-flex justify-content-between mb-2 text-muted small">
                 <span>Shipping</span>
-                <span>{shipping === 0 ? 'Free' : formatPrice(shipping)}</span>
+                <span>{shipping === 0 ? 'Free' : formatPrice(shipping, 'INR', 2)}</span>
+              </div>
+              <div className="d-flex justify-content-between mb-2 text-muted small">
+                <span>GST (18%)</span>
+                <span>{formatPrice(tax, 'INR', 2)}</span>
               </div>
               <hr />
               <div className="d-flex justify-content-between fw-semibold mb-4">
                 <span>Total</span>
-                <span>{formatPrice(total)}</span>
+                <span>{formatPrice(total, 'INR', 2)}</span>
               </div>
               <Button className="w-100" loading={loading} onClick={payNow} disabled={!selectedAddressId}>
                 Pay Now

@@ -6,11 +6,14 @@ import QuantitySelector from '../../components/ui/QuantitySelector';
 import PriceDisplay from '../../components/ui/PriceDisplay';
 import Button from '../../components/ui/Button';
 import useCart from '../../hooks/useCart';
-import { formatPrice } from '../../utils/formatPrice';
+import { formatPrice, getCartItemUnitPrice } from '../../utils/formatPrice';
 import { getProductImage } from '../../utils/helpers';
 
 export default function Cart() {
   const { items, subtotal, updateQuantity, removeItem, clearCart } = useCart();
+  const shipping = subtotal >= 999 ? 0 : 99;
+  const tax = Math.round(subtotal * 0.18 * 100) / 100;
+  const total = Math.round((subtotal + shipping + tax) * 100) / 100;
 
   return (
     <>
@@ -28,24 +31,33 @@ export default function Cart() {
         ) : (
           <div className="row g-5">
             <div className="col-lg-8">
-              {items.map((item) => (
-                <div key={item.id} className="d-flex gap-3 border-bottom py-4">
-                  <Link to={`/product/${item.slug}`}>
-                    <img src={getProductImage(item)} alt={item.name} style={{ width: 100, aspectRatio: '3/4', objectFit: 'cover' }} />
-                  </Link>
-                  <div className="flex-grow-1">
-                    <Link to={`/product/${item.slug}`} className="fw-medium text-dark text-decoration-none">{item.name}</Link>
-                    {item.size && <div className="small text-muted">Size: {item.size}</div>}
-                    {item.color && <div className="small text-muted">Color: {item.color}</div>}
-                    <PriceDisplay price={item.price ?? item.unit_price} size="sm" />
-                    <div className="d-flex align-items-center gap-3 mt-2">
-                      <QuantitySelector value={item.quantity} onChange={(q) => updateQuantity(item.id, q)} />
-                      <button className="btn btn-link btn-sm text-muted p-0" onClick={() => removeItem(item.id)}>Remove</button>
+              {items.map((item) => {
+                const unit = getCartItemUnitPrice(item);
+                const regular = Number(item.regular_price ?? item.price ?? 0);
+                const showSale = regular > unit;
+                return (
+                  <div key={item.id} className="d-flex gap-3 border-bottom py-4">
+                    <Link to={`/product/${item.slug}`}>
+                      <img src={getProductImage(item)} alt={item.name} style={{ width: 100, aspectRatio: '3/4', objectFit: 'cover' }} />
+                    </Link>
+                    <div className="flex-grow-1">
+                      <Link to={`/product/${item.slug}`} className="fw-medium text-dark text-decoration-none">{item.name}</Link>
+                      {item.size && <div className="small text-muted">Size: {item.size}</div>}
+                      {item.color && <div className="small text-muted">Color: {item.color}</div>}
+                      <PriceDisplay
+                        price={showSale ? regular : unit}
+                        salePrice={showSale ? unit : null}
+                        size="sm"
+                      />
+                      <div className="d-flex align-items-center gap-3 mt-2">
+                        <QuantitySelector value={item.quantity} onChange={(q) => updateQuantity(item.id, q)} />
+                        <button className="btn btn-link btn-sm text-muted p-0" onClick={() => removeItem(item.id)}>Remove</button>
+                      </div>
                     </div>
+                    <div className="fw-semibold">{formatPrice(unit * item.quantity, 'INR', 2)}</div>
                   </div>
-                  <div className="fw-semibold">{formatPrice((item.price ?? item.unit_price) * item.quantity)}</div>
-                </div>
-              ))}
+                );
+              })}
               <button className="btn btn-link text-muted p-0 mt-3" onClick={clearCart}>Clear Cart</button>
             </div>
             <div className="col-lg-4">
@@ -53,16 +65,20 @@ export default function Cart() {
                 <h5 className="text-uppercase small fw-semibold mb-4">Order Summary</h5>
                 <div className="d-flex justify-content-between mb-2">
                   <span>Subtotal</span>
-                  <span>{formatPrice(subtotal)}</span>
+                  <span>{formatPrice(subtotal, 'INR', 2)}</span>
                 </div>
                 <div className="d-flex justify-content-between mb-2 text-muted small">
                   <span>Shipping</span>
-                  <span>{subtotal >= 999 ? 'Free' : formatPrice(99)}</span>
+                  <span>{shipping === 0 ? 'Free' : formatPrice(shipping, 'INR', 2)}</span>
+                </div>
+                <div className="d-flex justify-content-between mb-2 text-muted small">
+                  <span>GST (18%)</span>
+                  <span>{formatPrice(tax, 'INR', 2)}</span>
                 </div>
                 <hr />
                 <div className="d-flex justify-content-between fw-semibold mb-4">
                   <span>Total</span>
-                  <span>{formatPrice(subtotal + (subtotal >= 999 ? 0 : 99))}</span>
+                  <span>{formatPrice(total, 'INR', 2)}</span>
                 </div>
                 <Link to="/checkout"><Button className="w-100">Proceed to Checkout</Button></Link>
                 <Link to="/shop" className="d-block text-center mt-3 small text-muted">Continue Shopping</Link>

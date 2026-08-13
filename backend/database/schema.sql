@@ -255,10 +255,11 @@ CREATE TABLE IF NOT EXISTS orders (
     total DECIMAL(12, 2) NOT NULL,
     coupon_id INT UNSIGNED NULL,
     payment_status ENUM('pending', 'paid', 'failed', 'refunded') DEFAULT 'pending',
-    payment_method ENUM('phonepe', 'stripe', 'cod', 'upi') NULL,
+    payment_method ENUM('phonepe', 'stripe', 'cod', 'upi', 'cashfree') NULL,
     shipping_address JSON NULL,
     billing_address JSON NULL,
     notes TEXT NULL,
+    email_notified_at DATETIME NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id),
@@ -516,6 +517,28 @@ CREATE TABLE IF NOT EXISTS deliveries (
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
     FOREIGN KEY (partner_id) REFERENCES delivery_partners(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
+
+-- Customer tracking follow-up queries (admin Followups)
+CREATE TABLE IF NOT EXISTS tracking_followups (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    order_id INT UNSIGNED NOT NULL,
+    user_id INT UNSIGNED NOT NULL,
+    subject VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    customer_name VARCHAR(255) NULL,
+    customer_email VARCHAR(255) NULL,
+    customer_phone VARCHAR(30) NULL,
+    status ENUM('pending', 'shared_response') NOT NULL DEFAULT 'pending',
+    tracking_number VARCHAR(255) NULL,
+    carrier VARCHAR(100) NULL,
+    admin_notes TEXT NULL,
+    responded_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    INDEX idx_followups_status (status),
+    INDEX idx_followups_order (order_id),
+    INDEX idx_followups_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Rate limits
 CREATE TABLE IF NOT EXISTS rate_limits (

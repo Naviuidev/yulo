@@ -1,4 +1,15 @@
-const ConfirmModal = ({ show, title, message, confirmLabel = 'Delete', cancelLabel = 'Cancel', onConfirm, onCancel, variant = 'danger' }) => {
+const ConfirmModal = ({
+  show,
+  title,
+  message,
+  children = null,
+  confirmLabel = 'Delete',
+  cancelLabel = 'Cancel',
+  onConfirm,
+  onCancel,
+  variant = 'danger',
+  confirmDisabled = false,
+}) => {
   if (!show) return null;
 
   return (
@@ -11,12 +22,20 @@ const ConfirmModal = ({ show, title, message, confirmLabel = 'Delete', cancelLab
               <h5 className="modal-title">{title}</h5>
               <button type="button" className="btn-close" onClick={onCancel} aria-label="Close" />
             </div>
-            <div className="modal-body">{message}</div>
+            <div className="modal-body">
+              {message ? <p className="mb-0">{message}</p> : null}
+              {children}
+            </div>
             <div className="modal-footer border-0">
               <button type="button" className="btn btn-light" onClick={onCancel}>
                 {cancelLabel}
               </button>
-              <button type="button" className={`btn btn-${variant}`} onClick={onConfirm}>
+              <button
+                type="button"
+                className={`btn btn-${variant}`}
+                onClick={onConfirm}
+                disabled={confirmDisabled}
+              >
                 {confirmLabel}
               </button>
             </div>

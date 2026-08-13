@@ -16,12 +16,15 @@ import Brands from '../pages/Brands/Brands';
 import Inventory from '../pages/Inventory/Inventory';
 import Coupons from '../pages/Coupons/Coupons';
 import Deliveries from '../pages/Deliveries/Deliveries';
+import Followups from '../pages/Followups/Followups';
 import Reports from '../pages/Reports/Reports';
 import Banners from '../pages/Banners/Banners';
 import OfferStrips from '../pages/OfferStrips/OfferStrips';
 import Blogs from '../pages/Blogs/Blogs';
 import FAQs from '../pages/FAQs/FAQs';
 import Settings from '../pages/Settings/Settings';
+import Payments from '../pages/Payments/Payments';
+import Shiprocket from '../pages/Shiprocket/Shiprocket';
 import Notifications from '../pages/Notifications/Notifications';
 import Visitors from '../pages/Visitors/Visitors';
 import Doc from '../pages/Doc/Doc';
@@ -53,11 +56,14 @@ const AppRoutes = () => (
       <Route path="inventory" element={<Inventory />} />
       <Route path="coupons" element={<Coupons />} />
       <Route path="deliveries" element={<Deliveries />} />
+      <Route path="followups" element={<Followups />} />
       <Route path="reports" element={<Reports />} />
       <Route path="banners" element={<Banners />} />
       <Route path="offer-strips" element={<OfferStrips />} />
       <Route path="blogs" element={<Blogs />} />
       <Route path="faqs" element={<FAQs />} />
+      <Route path="payments" element={<Payments />} />
+      <Route path="shiprocket" element={<Shiprocket />} />
       <Route path="settings" element={<Settings />} />
       <Route path="notifications" element={<Notifications />} />
       <Route path="visitors" element={<Visitors />} />

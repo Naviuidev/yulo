@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Thumbs } from 'swiper/modules';
 import SEO from '../../components/common/SEO';
@@ -16,6 +16,7 @@ import Button from '../../components/ui/Button';
 import ReviewForm from '../../components/forms/ReviewForm';
 import useCart from '../../hooks/useCart';
 import useWishlist from '../../hooks/useWishlist';
+import useAuth from '../../hooks/useAuth';
 import { CompareContext } from '../../context/CompareContext';
 import { useContext } from 'react';
 import { productService } from '../../services/productService';
@@ -27,11 +28,13 @@ import 'swiper/css/thumbs';
 
 export default function Product() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [related, setRelated] = useState([]);
   const [fbt, setFbt] = useState([]);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [buying, setBuying] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
@@ -39,6 +42,7 @@ export default function Product() {
   const [thumbsSwiper, setThumbsSwiper] = useState(null);
 
   const { addToCart } = useCart();
+  const { isAuthenticated } = useAuth();
   const { isInWishlist, toggleWishlist } = useWishlist();
   const { addToCompare, isInCompare } = useContext(CompareContext);
 
@@ -68,9 +72,35 @@ export default function Product() {
 
   const images = getProductImages(product);
 
-  const handleAddToCart = () => {
+  const resolveVariantOptions = () => {
     const variant = product.variants?.find((v) => v.size === selectedSize && v.color === selectedColor);
-    addToCart(product, { quantity, variant_id: variant?.id, size: selectedSize, color: selectedColor });
+    return {
+      quantity,
+      variant_id: variant?.id,
+      size: selectedSize,
+      color: selectedColor,
+    };
+  };
+
+  const handleAddToCart = () => {
+    addToCart(product, resolveVariantOptions());
+  };
+
+  const handleBuyNow = async () => {
+    if (!isAuthenticated) {
+      navigate('/login', {
+        state: { from: { pathname: `/product/${slug}` } },
+      });
+      return;
+    }
+
+    setBuying(true);
+    try {
+      const ok = await addToCart(product, { ...resolveVariantOptions(), silent: true });
+      if (ok) navigate('/checkout');
+    } finally {
+      setBuying(false);
+    }
   };
 
   return (
@@ -119,21 +149,31 @@ export default function Product() {
               <QuantitySelector value={quantity} onChange={setQuantity} />
             </div>
 
-            <div className="d-flex flex-wrap gap-2 mb-4">
-              <Button variant="gold" onClick={handleAddToCart}>Add to Cart</Button>
+            <div className="product-actions mb-4">
+              <div className="product-actions__row">
+                <Button variant="gold" onClick={handleAddToCart}>Add to Cart</Button>
+                <Button
+                  variant={isInWishlist(product.id) ? 'gold' : 'outline'}
+                  onClick={() => toggleWishlist(product)}
+                  aria-label="Wishlist"
+                >
+                  <i className={`bi ${isInWishlist(product.id) ? 'bi-heart-fill' : 'bi-heart'}`} />
+                </Button>
+                <Button
+                  variant={isInCompare(product.id) ? 'gold' : 'outline'}
+                  onClick={() => addToCompare(product)}
+                  aria-label="Compare"
+                >
+                  <i className="bi bi-arrow-left-right" />
+                </Button>
+              </div>
               <Button
-                variant={isInWishlist(product.id) ? 'gold' : 'outline'}
-                onClick={() => toggleWishlist(product)}
-                aria-label="Wishlist"
+                variant="primary"
+                className="product-actions__buy"
+                loading={buying}
+                onClick={handleBuyNow}
               >
-                <i className={`bi ${isInWishlist(product.id) ? 'bi-heart-fill' : 'bi-heart'}`} />
-              </Button>
-              <Button
-                variant={isInCompare(product.id) ? 'gold' : 'outline'}
-                onClick={() => addToCompare(product)}
-                aria-label="Compare"
-              >
-                <i className="bi bi-arrow-left-right" />
+                Buy Now
               </Button>
             </div>
           </div>

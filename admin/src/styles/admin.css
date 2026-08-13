@@ -603,6 +603,61 @@ body {
   border-radius: 20px;
 }
 
+.yulo-status-chip {
+  appearance: none;
+  border: 1px solid #b7e4c7;
+  background: #e9f8ef;
+  color: #1b7a3d;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  line-height: 1.2;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.yulo-status-chip:hover:not(:disabled) {
+  background: #d8f3e3;
+  border-color: #95d5b2;
+  color: #146c34;
+}
+
+.yulo-status-chip.is-active {
+  background: #b7e4c7;
+  border-color: #74c69d;
+  color: #0f5132;
+  font-weight: 600;
+}
+
+.yulo-status-chip:disabled {
+  opacity: 0.75;
+  cursor: default;
+}
+
+.yulo-status-chip--danger {
+  background: #fdebec;
+  border-color: #f1aeb5;
+  color: #b02a37;
+}
+
+.yulo-status-chip--danger.is-active {
+  background: #f5c2c7;
+  border-color: #ea868f;
+  color: #842029;
+}
+
+.yulo-status-chip--muted {
+  background: #f1f3f5;
+  border-color: #dee2e6;
+  color: #495057;
+}
+
+.yulo-status-chip--muted.is-active {
+  background: #dee2e6;
+  border-color: #adb5bd;
+  color: #212529;
+}
+
 /* Empty state */
 .yulo-empty {
   text-align: center;

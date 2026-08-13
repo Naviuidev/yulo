@@ -22,6 +22,7 @@ export const ORDER_STATUS_LABELS = {
   cancelled: 'Cancelled',
   returned: 'Returned',
   refunded: 'Refunded',
+  shared_response: 'Shared response',
 };
 
 export const STATUS_BADGE_MAP = {
@@ -40,6 +41,7 @@ export const STATUS_BADGE_MAP = {
   draft: 'secondary',
   paid: 'success',
   failed: 'danger',
+  shared_response: 'success',
 };
 
 export const NAV_ITEMS = [
@@ -54,6 +56,7 @@ export const NAV_ITEMS = [
   { path: '/inventory', icon: 'bi-boxes', label: 'Inventory' },
   { path: '/coupons', icon: 'bi-ticket-perforated', label: 'Coupons' },
   { path: '/deliveries', icon: 'bi-truck', label: 'Deliveries' },
+  { path: '/followups', icon: 'bi-chat-left-text', label: 'Followups' },
   { path: '/reports', icon: 'bi-file-earmark-bar-graph', label: 'Reports' },
   { path: '/banners', icon: 'bi-images', label: 'Banners' },
   { path: '/offer-strips', icon: 'bi-megaphone', label: 'Offers' },
@@ -61,6 +64,7 @@ export const NAV_ITEMS = [
   { path: '/faqs', icon: 'bi-question-circle', label: 'FAQs' },
   { path: '/notifications', icon: 'bi-bell', label: 'Notifications' },
   { path: '/visitors', icon: 'bi-eye', label: 'Visitors' },
+  { path: '/payments', icon: 'bi-credit-card', label: 'Payments' },
   { path: '/settings', icon: 'bi-gear', label: 'Settings' },
   { path: '/doc', icon: 'bi-book', label: 'Doc' },
 ];

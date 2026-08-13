@@ -53,8 +53,30 @@ final class Order
         $total = (int) $countStmt->fetchColumn();
 
         $stmt = $this->db->prepare(
-            'SELECT id, order_number, status, payment_status, total, created_at
-             FROM orders WHERE user_id = :user_id ORDER BY created_at DESC LIMIT :limit OFFSET :offset'
+            'SELECT o.id, o.order_number, o.status, o.payment_status, o.payment_method, o.total, o.created_at,
+                    (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id) AS item_count,
+                    (
+                        SELECT p.name
+                        FROM order_items oi
+                        JOIN products p ON p.id = oi.product_id
+                        WHERE oi.order_id = o.id
+                        ORDER BY oi.id ASC
+                        LIMIT 1
+                    ) AS product_name,
+                    (
+                        SELECT COALESCE(
+                            (SELECT pi.image_path FROM product_images pi WHERE pi.product_id = oi.product_id AND pi.is_primary = 1 LIMIT 1),
+                            (SELECT pi2.image_path FROM product_images pi2 WHERE pi2.product_id = oi.product_id ORDER BY pi2.id ASC LIMIT 1)
+                        )
+                        FROM order_items oi
+                        WHERE oi.order_id = o.id
+                        ORDER BY oi.id ASC
+                        LIMIT 1
+                    ) AS product_image
+             FROM orders o
+             WHERE o.user_id = :user_id
+             ORDER BY o.created_at DESC
+             LIMIT :limit OFFSET :offset'
         );
         $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);

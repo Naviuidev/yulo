@@ -24,6 +24,7 @@ const ForgotPassword = lazy(() => import('../pages/Auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('../pages/Auth/ResetPassword'));
 const VerifyEmail = lazy(() => import('../pages/Auth/VerifyEmail'));
 const TrackOrder = lazy(() => import('../pages/TrackOrder/TrackOrder'));
+const CashfreeReturn = lazy(() => import('../pages/Payment/CashfreeReturn'));
 const NotFound = lazy(() => import('../pages/NotFound/NotFound'));
 
 function SuspenseWrap({ children }) {
@@ -38,7 +39,14 @@ export default function AppRoutes() {
         <Route path="shop" element={<SuspenseWrap><Shop /></SuspenseWrap>} />
         <Route path="product/:slug" element={<SuspenseWrap><Product /></SuspenseWrap>} />
         <Route path="cart" element={<SuspenseWrap><Cart /></SuspenseWrap>} />
-        <Route path="checkout" element={<SuspenseWrap><Checkout /></SuspenseWrap>} />
+        <Route
+          path="checkout"
+          element={
+            <ProtectedRoute>
+              <SuspenseWrap><Checkout /></SuspenseWrap>
+            </ProtectedRoute>
+          }
+        />
         <Route path="wishlist" element={<SuspenseWrap><Wishlist /></SuspenseWrap>} />
         <Route path="compare" element={<SuspenseWrap><Compare /></SuspenseWrap>} />
         <Route path="blog" element={<SuspenseWrap><Blog /></SuspenseWrap>} />
@@ -46,6 +54,14 @@ export default function AppRoutes() {
         <Route path="contact" element={<SuspenseWrap><Contact /></SuspenseWrap>} />
         <Route path="about" element={<SuspenseWrap><About /></SuspenseWrap>} />
         <Route path="track-order" element={<SuspenseWrap><TrackOrder /></SuspenseWrap>} />
+        <Route
+          path="payment/cashfree/return"
+          element={
+            <ProtectedRoute>
+              <SuspenseWrap><CashfreeReturn /></SuspenseWrap>
+            </ProtectedRoute>
+          }
+        />
         <Route path="login" element={<SuspenseWrap><Login /></SuspenseWrap>} />
         <Route path="register" element={<SuspenseWrap><Register /></SuspenseWrap>} />
         <Route path="forgot-password" element={<SuspenseWrap><ForgotPassword /></SuspenseWrap>} />

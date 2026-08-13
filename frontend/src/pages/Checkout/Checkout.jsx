@@ -1,47 +1,83 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import SEO from '../../components/common/SEO';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import Button from '../../components/ui/Button';
+import Modal from '../../components/ui/Modal';
 import AddressForm from '../../components/forms/AddressForm';
 import useCart from '../../hooks/useCart';
 import useAuth from '../../hooks/useAuth';
 import { formatPrice } from '../../utils/formatPrice';
-import { couponService } from '../../services/orderService';
-import { orderService, paymentService } from '../../services/orderService';
+import { couponService, orderService } from '../../services/orderService';
 import { addressService } from '../../services/contentService';
-import { PAYMENT_METHODS } from '../../utils/constants';
+import { openCashfreeCheckout } from '../../utils/cashfreeCheckout';
+
+function formatAddress(addr) {
+  if (!addr) return '';
+  const name = addr.name || addr.full_name || '';
+  const line2 = addr.address_line2 ? `, ${addr.address_line2}` : '';
+  return `${name} · ${addr.address_line1}${line2}, ${addr.city}, ${addr.state} ${addr.pincode}`;
+}
+
+function normalizePhone(phone) {
+  return String(phone || '')
+    .replace(/\D/g, '')
+    .replace(/^91/, '')
+    .slice(-10);
+}
 
 export default function Checkout() {
-  const { items, subtotal, clearCart } = useCart();
-  const { isAuthenticated, user } = useAuth();
+  const { items, subtotal } = useCart();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+
   const [addresses, setAddresses] = useState([]);
-  const [selectedAddress, setSelectedAddress] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('cod');
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [addressesLoaded, setAddressesLoaded] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [discount, setDiscount] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [showAddressForm, setShowAddressForm] = useState(false);
-  const { register, handleSubmit } = useForm();
+  const [addressSaving, setAddressSaving] = useState(false);
+
+  const [showChangeModal, setShowChangeModal] = useState(false);
+  const [modalMode, setModalMode] = useState('list'); // list | add | edit
+  const [editingAddress, setEditingAddress] = useState(null);
 
   const shipping = subtotal >= 999 ? 0 : 99;
-  const total = subtotal + shipping - discount;
+  const total = Math.max(0, subtotal + shipping - discount);
+
+  const selectedAddress = useMemo(
+    () => addresses.find((a) => Number(a.id) === Number(selectedAddressId)) || null,
+    [addresses, selectedAddressId]
+  );
+
+  const loadAddresses = useCallback(async () => {
+    try {
+      const res = await addressService.getAddresses();
+      const addrs = res.data?.data ?? [];
+      setAddresses(addrs);
+      setSelectedAddressId((prev) => {
+        if (prev && addrs.some((a) => Number(a.id) === Number(prev))) return prev;
+        const def = addrs.find((a) => a.is_default) ?? addrs[0];
+        return def?.id ?? null;
+      });
+    } catch {
+      setAddresses([]);
+      setSelectedAddressId(null);
+    } finally {
+      setAddressesLoaded(true);
+    }
+  }, []);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      addressService.getAddresses()
-        .then((r) => {
-          const addrs = r.data?.data ?? [];
-          setAddresses(addrs);
-          const def = addrs.find((a) => a.is_default) ?? addrs[0];
-          if (def) setSelectedAddress(def.id);
-        })
-        .catch(() => {});
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      navigate('/login', { replace: true, state: { from: { pathname: '/checkout' } } });
+      return;
     }
-  }, [isAuthenticated]);
+    loadAddresses();
+  }, [authLoading, isAuthenticated, navigate, loadAddresses]);
 
   const applyCoupon = async () => {
     try {
@@ -54,68 +90,121 @@ export default function Checkout() {
     }
   };
 
-  const handleGuestCheckout = async (data) => {
-    await placeOrder({ guest: data });
+  const openChangeAddress = () => {
+    setModalMode('list');
+    setEditingAddress(null);
+    setShowChangeModal(true);
   };
 
-  const placeOrder = async (extra = {}) => {
+  const openAddAddress = () => {
+    setEditingAddress(null);
+    setModalMode('add');
+    setShowChangeModal(true);
+  };
+
+  const openEditAddress = (addr) => {
+    setEditingAddress(addr);
+    setModalMode('edit');
+    setShowChangeModal(true);
+  };
+
+  const closeModal = () => {
+    setShowChangeModal(false);
+    setModalMode('list');
+    setEditingAddress(null);
+  };
+
+  const saveAddress = async (data) => {
+    setAddressSaving(true);
+    try {
+      const payload = {
+        ...data,
+        name: data.name || data.full_name,
+        phone: normalizePhone(data.phone),
+        is_default: Boolean(data.is_default),
+      };
+
+      let saved;
+      if (modalMode === 'edit' && editingAddress?.id) {
+        const res = await addressService.updateAddress(editingAddress.id, payload);
+        saved = res.data?.data;
+        toast.success('Address updated');
+      } else {
+        const res = await addressService.createAddress(payload);
+        saved = res.data?.data;
+        toast.success('Address saved');
+      }
+
+      const wasEmpty = addresses.length === 0;
+      await loadAddresses();
+      if (saved?.id) setSelectedAddressId(saved.id);
+      else if (editingAddress?.id) setSelectedAddressId(editingAddress.id);
+
+      if (wasEmpty) {
+        closeModal();
+      } else {
+        setModalMode('list');
+        setEditingAddress(null);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? 'Could not save address');
+    } finally {
+      setAddressSaving(false);
+    }
+  };
+
+  const payNow = async () => {
     if (items.length === 0) {
       toast.error('Cart is empty');
       return;
     }
+    if (!selectedAddressId) {
+      toast.error('Please add a delivery address');
+      openAddAddress();
+      return;
+    }
+
     setLoading(true);
     try {
-      const payload = {
-        address_id: selectedAddress,
-        payment_method: paymentMethod,
+      const res = await orderService.checkoutCashfree({
+        shipping_address_id: selectedAddressId,
         coupon_code: couponCode || undefined,
-        ...extra,
-      };
-      const res = await orderService.createOrder(payload);
-      const order = res.data?.data;
-
-      if (paymentMethod === 'phonepe' && order?.id) {
-        const payRes = await paymentService.initiatePhonePe(order.id);
-        const url = payRes.data?.data?.redirect_url;
-        if (url) {
-          window.location.href = url;
-          return;
-        }
+        shipping_charge: shipping,
+      });
+      const pay = res.data?.data;
+      const sessionId = pay?.payment_session_id;
+      if (!sessionId) {
+        throw new Error('Could not start Cashfree checkout. Check Admin → Payments credentials.');
       }
 
-      await clearCart();
-      toast.success('Order placed successfully!');
-      navigate(`/orders/${order?.id ?? ''}`);
+      await openCashfreeCheckout({
+        paymentSessionId: sessionId,
+        env: pay?.env || 'sandbox',
+      });
+      // If SDK did not redirect, keep user here with a clear message.
+      toast.info('Complete payment in the Cashfree window to confirm your order.');
     } catch (err) {
-      toast.error(err.response?.data?.message ?? 'Checkout failed');
+      toast.error(err.response?.data?.message ?? err.message ?? 'Could not start payment');
     } finally {
       setLoading(false);
     }
   };
 
-  const saveAddress = async (data) => {
-    try {
-      const payload = {
-        ...data,
-        name: data.name || data.full_name,
-        phone: String(data.phone || '').replace(/\D/g, '').replace(/^91/, '').slice(-10),
-      };
-      const res = await addressService.createAddress(payload);
-      const addr = res.data?.data;
-      setAddresses((prev) => [...prev, addr]);
-      setSelectedAddress(addr?.id);
-      setShowAddressForm(false);
-      toast.success('Address saved');
-    } catch (err) {
-      toast.error(err.response?.data?.message ?? 'Could not save address');
-    }
-  };
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="container py-5 text-center text-muted">
+        Checking login…
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
       <div className="container py-5 text-center">
         <p>Your cart is empty.</p>
-        <Link to="/shop"><Button>Shop Now</Button></Link>
+        <Link to="/shop">
+          <Button>Shop Now</Button>
+        </Link>
       </div>
     );
   }
@@ -133,79 +222,45 @@ export default function Checkout() {
       <div className="container py-5">
         <div className="row g-5">
           <div className="col-lg-7">
-            {!isAuthenticated && (
-              <div className="border p-4 mb-4">
-                <h5 className="text-uppercase small fw-semibold mb-3">Guest Checkout</h5>
-                <form onSubmit={handleSubmit(handleGuestCheckout)} className="yulo-form">
-                  <div className="row g-3">
-                    <div className="col-md-6">
-                      <input className="form-control" placeholder="Full Name" {...register('name', { required: true })} />
-                    </div>
-                    <div className="col-md-6">
-                      <input type="email" className="form-control" placeholder="Email" {...register('email', { required: true })} />
-                    </div>
-                    <div className="col-12">
-                      <input className="form-control" placeholder="Phone" {...register('phone', { required: true })} />
-                    </div>
-                    <div className="col-12">
-                      <input className="form-control" placeholder="Address" {...register('address_line1', { required: true })} />
-                    </div>
-                    <div className="col-md-4">
-                      <input className="form-control" placeholder="City" {...register('city', { required: true })} />
-                    </div>
-                    <div className="col-md-4">
-                      <input className="form-control" placeholder="State" {...register('state', { required: true })} />
-                    </div>
-                    <div className="col-md-4">
-                      <input className="form-control" placeholder="PIN Code" {...register('pincode', { required: true })} />
-                    </div>
-                  </div>
-                  <p className="small text-muted mt-3">
-                    Have an account? <Link to="/login">Sign in</Link> for faster checkout.
-                  </p>
-                </form>
-              </div>
-            )}
-
-            {isAuthenticated && (
-              <div className="border p-4 mb-4">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h5 className="text-uppercase small fw-semibold mb-0">Delivery Address</h5>
-                  <button className="btn btn-link btn-sm p-0" onClick={() => setShowAddressForm(!showAddressForm)}>
-                    {showAddressForm ? 'Cancel' : '+ Add Address'}
+            <div className="border p-4 mb-4">
+              <div className="d-flex justify-content-between align-items-start gap-3 mb-3">
+                <h5 className="text-uppercase small fw-semibold mb-0">Delivery Address</h5>
+                {addressesLoaded && addresses.length > 0 ? (
+                  <button type="button" className="btn btn-link btn-sm p-0 text-decoration-none" onClick={openChangeAddress}>
+                    Change Address
                   </button>
-                </div>
-                {showAddressForm ? (
-                  <AddressForm onSubmit={saveAddress} />
-                ) : (
-                  <div className="d-flex flex-column gap-2">
-                    {addresses.length === 0 ? (
-                      <p className="text-muted small">No saved addresses. Add one to continue.</p>
-                    ) : (
-                      addresses.map((addr) => (
-                        <label key={addr.id} className={`border p-3 d-flex gap-2 ${selectedAddress === addr.id ? 'border-dark' : ''}`}>
-                          <input type="radio" name="address" checked={selectedAddress === addr.id} onChange={() => setSelectedAddress(addr.id)} />
-                          <div>
-                            <strong>{addr.full_name}</strong>
-                            <div className="small text-muted">{addr.address_line1}, {addr.city}, {addr.state} {addr.pincode}</div>
-                          </div>
-                        </label>
-                      ))
-                    )}
-                  </div>
-                )}
+                ) : null}
               </div>
-            )}
+
+              {!addressesLoaded ? (
+                <p className="text-muted small mb-0">Loading addresses…</p>
+              ) : selectedAddress ? (
+                <div className="border p-3 bg-light">
+                  <div className="fw-semibold">{selectedAddress.name || selectedAddress.full_name}</div>
+                  <div className="small text-muted mt-1">
+                    {selectedAddress.address_line1}
+                    {selectedAddress.address_line2 ? `, ${selectedAddress.address_line2}` : ''}
+                  </div>
+                  <div className="small text-muted">
+                    {selectedAddress.city}, {selectedAddress.state} {selectedAddress.pincode}
+                  </div>
+                  <div className="small text-muted mt-1">Phone: {selectedAddress.phone}</div>
+                </div>
+              ) : (
+                <div className="border border-dashed p-4 text-center">
+                  <p className="text-muted mb-3">No delivery address found. Add an address to continue.</p>
+                  <Button variant="outline" onClick={openAddAddress}>
+                    Add Address
+                  </Button>
+                </div>
+              )}
+            </div>
 
             <div className="border p-4">
-              <h5 className="text-uppercase small fw-semibold mb-3">Payment Method</h5>
-              {PAYMENT_METHODS.map((pm) => (
-                <label key={pm.id} className={`d-flex align-items-center gap-3 border p-3 mb-2 ${paymentMethod === pm.id ? 'border-dark' : ''}`}>
-                  <input type="radio" name="payment" checked={paymentMethod === pm.id} onChange={() => setPaymentMethod(pm.id)} />
-                  <i className={`bi ${pm.icon}`} />
-                  <span>{pm.label}</span>
-                </label>
-              ))}
+              <h5 className="text-uppercase small fw-semibold mb-2">Payment</h5>
+              <p className="small text-muted mb-0">
+                Secure checkout via Cashfree. Click <strong>Pay Now</strong> to open the payment gateway — your order is confirmed only after payment succeeds.
+              </p>
             </div>
           </div>
 
@@ -214,27 +269,142 @@ export default function Checkout() {
               <h5 className="text-uppercase small fw-semibold mb-4">Order Summary</h5>
               {items.map((item) => (
                 <div key={item.id} className="d-flex justify-content-between small mb-2">
-                  <span>{item.name} × {item.quantity}</span>
+                  <span>
+                    {item.name} × {item.quantity}
+                  </span>
                   <span>{formatPrice((item.price ?? item.unit_price) * item.quantity)}</span>
                 </div>
               ))}
               <hr />
               <div className="d-flex gap-2 mb-3">
-                <input className="form-control form-control-sm" placeholder="Coupon code" value={couponCode} onChange={(e) => setCouponCode(e.target.value)} />
-                <Button variant="outline" onClick={applyCoupon}>Apply</Button>
+                <input
+                  className="form-control form-control-sm"
+                  placeholder="Coupon code"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                />
+                <Button variant="outline" onClick={applyCoupon}>
+                  Apply
+                </Button>
               </div>
-              <div className="d-flex justify-content-between mb-2"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></div>
-              {discount > 0 && <div className="d-flex justify-content-between mb-2 text-success"><span>Discount</span><span>-{formatPrice(discount)}</span></div>}
-              <div className="d-flex justify-content-between mb-2 text-muted small"><span>Shipping</span><span>{shipping === 0 ? 'Free' : formatPrice(shipping)}</span></div>
+              <div className="d-flex justify-content-between mb-2">
+                <span>Subtotal</span>
+                <span>{formatPrice(subtotal)}</span>
+              </div>
+              {discount > 0 && (
+                <div className="d-flex justify-content-between mb-2 text-success">
+                  <span>Discount</span>
+                  <span>-{formatPrice(discount)}</span>
+                </div>
+              )}
+              <div className="d-flex justify-content-between mb-2 text-muted small">
+                <span>Shipping</span>
+                <span>{shipping === 0 ? 'Free' : formatPrice(shipping)}</span>
+              </div>
               <hr />
-              <div className="d-flex justify-content-between fw-semibold mb-4"><span>Total</span><span>{formatPrice(total)}</span></div>
-              <Button className="w-100" loading={loading} onClick={() => isAuthenticated ? placeOrder() : handleSubmit(handleGuestCheckout)()}>
-                Place Order
+              <div className="d-flex justify-content-between fw-semibold mb-4">
+                <span>Total</span>
+                <span>{formatPrice(total)}</span>
+              </div>
+              <Button className="w-100" loading={loading} onClick={payNow} disabled={!selectedAddressId}>
+                Pay Now
               </Button>
             </div>
           </div>
         </div>
       </div>
+
+      <Modal
+        show={showChangeModal}
+        onClose={closeModal}
+        title={modalMode === 'edit' ? 'Edit Address' : modalMode === 'add' ? 'Add Address' : 'Change Address'}
+        size="modal-lg"
+      >
+        {modalMode === 'list' ? (
+          <div>
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <p className="small text-muted mb-0">Select a delivery address or edit an existing one.</p>
+              <Button variant="outline" onClick={() => setModalMode('add')}>
+                + Add New
+              </Button>
+            </div>
+            <div className="d-flex flex-column gap-2">
+              {addresses.map((addr) => (
+                <div
+                  key={addr.id}
+                  className={`border p-3 d-flex gap-3 align-items-start ${
+                    Number(selectedAddressId) === Number(addr.id) ? 'border-dark' : ''
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    className="mt-1"
+                    name="checkout-address"
+                    checked={Number(selectedAddressId) === Number(addr.id)}
+                    onChange={() => setSelectedAddressId(addr.id)}
+                  />
+                  <div className="flex-grow-1">
+                    <div className="fw-semibold">{addr.name || addr.full_name}</div>
+                    <div className="small text-muted">{formatAddress(addr)}</div>
+                  </div>
+                  <button type="button" className="btn btn-sm btn-outline-dark" onClick={() => openEditAddress(addr)}>
+                    Edit
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="d-flex justify-content-end gap-2 mt-4">
+              <Button variant="outline" onClick={closeModal}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!selectedAddressId) {
+                    toast.error('Select an address');
+                    return;
+                  }
+                  closeModal();
+                }}
+              >
+                Deliver Here
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <button
+              type="button"
+              className="btn btn-link btn-sm p-0 mb-3 text-decoration-none"
+              onClick={() => {
+                setModalMode(addresses.length ? 'list' : 'add');
+                setEditingAddress(null);
+                if (!addresses.length) closeModal();
+              }}
+            >
+              ← Back
+            </button>
+            <AddressForm
+              key={editingAddress?.id || 'new-address'}
+              defaultValues={
+                editingAddress
+                  ? {
+                      name: editingAddress.name || editingAddress.full_name || '',
+                      phone: normalizePhone(editingAddress.phone),
+                      address_line1: editingAddress.address_line1 || '',
+                      address_line2: editingAddress.address_line2 || '',
+                      city: editingAddress.city || '',
+                      state: editingAddress.state || '',
+                      pincode: editingAddress.pincode || '',
+                      is_default: Boolean(editingAddress.is_default),
+                    }
+                  : { is_default: addresses.length === 0 }
+              }
+              onSubmit={saveAddress}
+              loading={addressSaving}
+            />
+          </div>
+        )}
+      </Modal>
     </>
   );
 }

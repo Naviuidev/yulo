@@ -66,13 +66,84 @@ final class SchemaGuard
         self::$homeSectionsReady = true;
     }
 
+    /** Ensure orders.payment_method accepts cashfree. */
+    public static function ensureCashfreePaymentMethod(PDO $db): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+
+        try {
+            $db->exec(
+                "ALTER TABLE orders
+                 MODIFY COLUMN payment_method ENUM('phonepe', 'stripe', 'cod', 'upi', 'cashfree') NULL"
+            );
+        } catch (Throwable) {
+            // Ignore if already applied / no permission — create will surface a clear error.
+        }
+
+        $ready = true;
+    }
+
+    /** Track whether paid-order emails (invoice + owner notify) were sent. */
+    public static function ensureOrderEmailNotifiedAt(PDO $db): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+
+        self::ensureColumn($db, 'orders', 'email_notified_at', 'DATETIME NULL');
+        $ready = true;
+    }
+
+    /** Customer tracking follow-up queries for admin Followups. */
+    public static function ensureTrackingFollowups(PDO $db): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+
+        $db->exec(
+            "CREATE TABLE IF NOT EXISTS tracking_followups (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                order_id INT UNSIGNED NOT NULL,
+                user_id INT UNSIGNED NOT NULL,
+                subject VARCHAR(255) NOT NULL,
+                message TEXT NOT NULL,
+                customer_name VARCHAR(255) NULL,
+                customer_email VARCHAR(255) NULL,
+                customer_phone VARCHAR(30) NULL,
+                status ENUM('pending', 'shared_response') NOT NULL DEFAULT 'pending',
+                tracking_number VARCHAR(255) NULL,
+                carrier VARCHAR(100) NULL,
+                admin_notes TEXT NULL,
+                responded_at DATETIME NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                INDEX idx_followups_status (status),
+                INDEX idx_followups_order (order_id),
+                INDEX idx_followups_user (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+
+        $ready = true;
+    }
+
     private static function ensureColumn(PDO $db, string $table, string $column, string $definition): void
     {
+        $schema = (string) ($_ENV['DB_NAME'] ?? '');
+        if ($schema === '') {
+            $schema = (string) $db->query('SELECT DATABASE()')->fetchColumn();
+        }
+
         $stmt = $db->prepare(
             'SELECT COUNT(*) FROM information_schema.COLUMNS
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table AND COLUMN_NAME = :column'
+             WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = :table AND COLUMN_NAME = :column'
         );
-        $stmt->execute(['table' => $table, 'column' => $column]);
+        $stmt->execute(['schema' => $schema, 'table' => $table, 'column' => $column]);
         if ((int) $stmt->fetchColumn() > 0) {
             return;
         }

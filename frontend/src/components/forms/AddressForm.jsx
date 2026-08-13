@@ -11,7 +11,6 @@ export default function AddressForm({ onSubmit, defaultValues = {}, loading = fa
           <label className="form-label">Full Name</label>
           <input
             className={`form-control ${errors.name ? 'is-invalid' : ''}`}
-            defaultValue={defaultValues.name || defaultValues.full_name || ''}
             {...register('name', { required: true })}
           />
         </div>

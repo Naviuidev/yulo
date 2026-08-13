@@ -39,7 +39,7 @@ export function CartProvider({ children }) {
   };
 
   const addToCart = async (product, options = {}) => {
-    const { quantity = 1, variant_id = null, size, color } = options;
+    const { quantity = 1, variant_id = null, size, color, silent = false } = options;
     const payload = {
       product_id: product.id,
       quantity,
@@ -80,9 +80,11 @@ export function CartProvider({ children }) {
         }
         persistGuest(next);
       }
-      toast.success('Added to cart');
+      if (!silent) toast.success('Added to cart');
+      return true;
     } catch (err) {
       toast.error(err.response?.data?.message ?? 'Could not add to cart');
+      return false;
     }
   };
 

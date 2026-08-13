@@ -9,8 +9,15 @@ const orderService = {
     const res = await api.get(`/admin/orders/${id}`);
     return extractData(res);
   },
-  updateStatus: async (id, status) => {
-    const res = await api.patch(`/admin/orders/${id}/status`, { status });
+  updateStatus: async (id, status, options = {}) => {
+    const res = await api.patch(`/admin/orders/${id}/status`, {
+      status,
+      notify_customer: Boolean(options.notify_customer),
+    });
+    return extractData(res);
+  },
+  shareTracking: async (id, data) => {
+    const res = await api.post(`/admin/orders/${id}/share-tracking`, data);
     return extractData(res);
   },
 };

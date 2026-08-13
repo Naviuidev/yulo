@@ -47,7 +47,11 @@ const Settings = () => {
           <div className="col-md-6">
             <h6 className="text-gold mb-3">Store Information</h6>
             <div className="mb-3"><label className="form-label">Store Name</label><input className="form-control" {...register('store_name')} /></div>
-            <div className="mb-3"><label className="form-label">Store Email</label><input type="email" className="form-control" {...register('store_email')} /></div>
+            <div className="mb-3">
+              <label className="form-label">Store Email</label>
+              <input type="email" className="form-control" {...register('store_email')} />
+              <div className="form-text">Used for new-order owner notifications (customer still gets the invoice).</div>
+            </div>
             <div className="mb-3"><label className="form-label">Store Phone</label><input className="form-control" {...register('store_phone')} /></div>
             <div className="mb-3"><label className="form-label">Address</label><textarea className="form-control" rows={3} {...register('store_address')} /></div>
           </div>

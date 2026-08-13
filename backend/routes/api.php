@@ -56,6 +56,7 @@ $router->get('/offer-card', [OfferCardController::class, 'show']);
 
 // Payments callback (public webhook)
 $router->post('/payments/phonepe/callback', [PaymentController::class, 'phonePeCallback']);
+$router->post('/payments/cashfree/webhook', [PaymentController::class, 'cashfreeWebhook']);
 
 // Authenticated customer routes
 $auth = [AuthMiddleware::class];
@@ -78,6 +79,7 @@ $router->delete('/compare', [CompareController::class, 'clear'], $auth);
 
 $router->post('/checkout/guest', [CheckoutController::class, 'guest']);
 $router->get('/checkout/summary', [CheckoutController::class, 'summary'], $auth);
+$router->post('/checkout/cashfree', [CheckoutController::class, 'payCashfree'], $auth);
 $router->get('/orders', [OrderController::class, 'index'], $auth);
 $router->post('/orders', [OrderController::class, 'create'], $auth);
 $router->get('/orders/track/{order_number}', [OrderController::class, 'trackByNumber']);
@@ -86,8 +88,13 @@ $router->post('/orders/{id}/cancel', [OrderController::class, 'cancel'], $auth);
 $router->get('/orders/{id}/track', [OrderController::class, 'track'], $auth);
 $router->get('/orders/{id}/invoice', [OrderController::class, 'invoice'], $auth);
 
+$router->post('/followups/tracking', [FollowupController::class, 'store'], $auth);
+$router->get('/followups/tracking/order/{order_id}', [FollowupController::class, 'forOrder'], $auth);
+
 $router->post('/reviews', [ReviewController::class, 'store'], $auth);
 $router->post('/payments/phonepe/initiate', [PaymentController::class, 'initiatePhonePe'], $auth);
+$router->post('/payments/cashfree/initiate', [PaymentController::class, 'initiateCashfree'], $auth);
+$router->post('/payments/cashfree/verify', [PaymentController::class, 'verifyCashfree'], $auth);
 
 $router->get('/profile', [ProfileController::class, 'show'], $auth);
 $router->put('/profile', [ProfileController::class, 'update'], $auth);
@@ -138,6 +145,7 @@ $router->group('/admin', function (Router $router) use ($admin) {
     $router->get('/orders', [OrderAdminController::class, 'index'], $admin);
     $router->get('/orders/{id}', [OrderAdminController::class, 'show'], $admin);
     $router->patch('/orders/{id}/status', [OrderAdminController::class, 'updateStatus'], $admin);
+    $router->post('/orders/{id}/share-tracking', [OrderAdminController::class, 'shareTracking'], $admin);
 
     $router->get('/customers', [CustomerAdminController::class, 'index'], $admin);
     $router->get('/customers/{id}', [CustomerAdminController::class, 'show'], $admin);
@@ -161,10 +169,14 @@ $router->group('/admin', function (Router $router) use ($admin) {
     $router->get('/analytics/overview', [AnalyticsController::class, 'overview'], $admin);
     $router->get('/analytics/traffic', [AnalyticsController::class, 'traffic'], $admin);
 
-    // Deliveries
+    // Deliveries & Follow-ups
     $router->get('/deliveries', [DeliveryAdminController::class, 'index'], $admin);
     $router->post('/deliveries', [DeliveryAdminController::class, 'store'], $admin);
     $router->put('/deliveries/{id}', [DeliveryAdminController::class, 'update'], $admin);
+
+    $router->get('/followups', [FollowupAdminController::class, 'index'], $admin);
+    $router->get('/followups/{id}', [FollowupAdminController::class, 'show'], $admin);
+    $router->post('/followups/{id}/share-response', [FollowupAdminController::class, 'shareResponse'], $admin);
 
     // Banners & Settings
     $router->get('/banners', [BannerAdminController::class, 'index'], $admin);
@@ -196,6 +208,12 @@ $router->group('/admin', function (Router $router) use ($admin) {
 
     $router->get('/settings', [SettingsAdminController::class, 'index'], $admin);
     $router->put('/settings', [SettingsAdminController::class, 'update'], $admin);
+
+    $router->get('/payments/cashfree', [PaymentAdminController::class, 'showCashfree'], $admin);
+    $router->put('/payments/cashfree', [PaymentAdminController::class, 'updateCashfree'], $admin);
+    $router->get('/shiprocket', [ShiprocketAdminController::class, 'show'], $admin);
+    $router->put('/shiprocket', [ShiprocketAdminController::class, 'update'], $admin);
+    $router->post('/shiprocket/test', [ShiprocketAdminController::class, 'testConnection'], $admin);
 
     // Blogs & FAQs
     $router->get('/blogs', [BlogAdminController::class, 'index'], $admin);

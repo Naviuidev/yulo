@@ -54,6 +54,14 @@ final class OrderAdminController extends BaseController
         }
 
         $order['items'] = $this->orderModel->getItems((int) $order['id']);
+
+        $delStmt = $this->db->prepare(
+            'SELECT id, carrier, tracking_number, status, estimated_delivery, notes, created_at
+             FROM deliveries WHERE order_id = :order_id ORDER BY id DESC LIMIT 1'
+        );
+        $delStmt->execute(['order_id' => $order['id']]);
+        $order['delivery'] = $delStmt->fetch() ?: null;
+
         Response::jsonSuccess($order);
     }
 
@@ -69,24 +77,145 @@ final class OrderAdminController extends BaseController
             Response::jsonError('Invalid status.', 422);
         }
 
-        $stmt = $this->db->prepare('UPDATE orders SET status = :status, updated_at = NOW() WHERE id = :id');
-        $stmt->execute(['status' => $input['status'], 'id' => $params['id']]);
+        $orderId = (int) $params['id'];
+        $status = (string) $input['status'];
+        $notifyCustomer = !empty($input['notify_customer']);
 
-        if ($input['status'] === 'delivered') {
-            $order = $this->orderModel->findById((int) $params['id']);
-            if ($order) {
-                $notif = $this->db->prepare(
-                    'INSERT INTO notifications (user_id, title, message, type, created_at) VALUES (:user_id, :title, :message, :type, NOW())'
-                );
-                $notif->execute([
-                    'user_id' => $order['user_id'],
-                    'title' => 'Order Delivered',
-                    'message' => "Your order {$order['order_number']} has been delivered.",
-                    'type' => 'order',
-                ]);
+        $order = $this->orderModel->findById($orderId);
+        if (!$order) {
+            Response::jsonError('Order not found.', 404);
+        }
+
+        $stmt = $this->db->prepare('UPDATE orders SET status = :status, updated_at = NOW() WHERE id = :id');
+        $stmt->execute(['status' => $status, 'id' => $orderId]);
+
+        $labels = [
+            'pending' => 'Pending',
+            'confirmed' => 'Confirmed',
+            'processing' => 'Processing',
+            'packed' => 'Packed',
+            'shipped' => 'Shipped',
+            'out_for_delivery' => 'Out for Delivery',
+            'delivered' => 'Delivered',
+            'cancelled' => 'Cancelled',
+            'returned' => 'Returned',
+            'refunded' => 'Refunded',
+        ];
+        $statusLabel = $labels[$status] ?? $status;
+
+        $notif = $this->db->prepare(
+            'INSERT INTO notifications (user_id, title, message, type, created_at) VALUES (:user_id, :title, :message, :type, NOW())'
+        );
+        $notif->execute([
+            'user_id' => $order['user_id'],
+            'title' => 'Order ' . $statusLabel,
+            'message' => "Your order {$order['order_number']} is now {$statusLabel}.",
+            'type' => 'order',
+        ]);
+
+        $emailResult = ['sent' => false, 'message' => 'Email not requested.'];
+        if ($notifyCustomer) {
+            try {
+                $emailResult = (new OrderMailService($this->db))->notifyStatusUpdate($orderId, $status);
+            } catch (Throwable $e) {
+                error_log('Order status email failed: ' . $e->getMessage());
+                $emailResult = ['sent' => false, 'message' => 'Failed to send status email.'];
             }
         }
 
-        Response::jsonSuccess(null, 'Order status updated.');
+        Response::jsonSuccess([
+            'status' => $status,
+            'email_sent' => (bool) ($emailResult['sent'] ?? false),
+            'email_message' => (string) ($emailResult['message'] ?? ''),
+        ], 'Order status updated.');
+    }
+
+    /** Save tracking number and optionally email the customer a track link. */
+    public function shareTracking(array $params): void
+    {
+        $input = $this->getJsonInput();
+        $orderId = (int) $params['id'];
+        $trackingNumber = trim((string) ($input['tracking_number'] ?? ''));
+        $carrier = trim((string) ($input['carrier'] ?? ''));
+        $notifyCustomer = !array_key_exists('notify_customer', $input) || !empty($input['notify_customer']);
+        $markShipped = !array_key_exists('mark_shipped', $input) || !empty($input['mark_shipped']);
+
+        if ($trackingNumber === '') {
+            Response::jsonError('Tracking number is required.', 422);
+        }
+
+        $order = $this->orderModel->findById($orderId);
+        if (!$order) {
+            Response::jsonError('Order not found.', 404);
+        }
+
+        $existing = $this->db->prepare(
+            'SELECT id FROM deliveries WHERE order_id = :order_id ORDER BY id DESC LIMIT 1'
+        );
+        $existing->execute(['order_id' => $orderId]);
+        $deliveryId = $existing->fetchColumn();
+
+        if ($deliveryId) {
+            $this->db->prepare(
+                'UPDATE deliveries
+                 SET carrier = :carrier, tracking_number = :tracking_number, status = :status, updated_at = NOW()
+                 WHERE id = :id'
+            )->execute([
+                'carrier' => $carrier !== '' ? $carrier : null,
+                'tracking_number' => $trackingNumber,
+                'status' => 'in_transit',
+                'id' => (int) $deliveryId,
+            ]);
+        } else {
+            $this->db->prepare(
+                'INSERT INTO deliveries (order_id, carrier, tracking_number, status, created_at, updated_at)
+                 VALUES (:order_id, :carrier, :tracking_number, :status, NOW(), NOW())'
+            )->execute([
+                'order_id' => $orderId,
+                'carrier' => $carrier !== '' ? $carrier : null,
+                'tracking_number' => $trackingNumber,
+                'status' => 'in_transit',
+            ]);
+            $deliveryId = (int) $this->db->lastInsertId();
+        }
+
+        if ($markShipped && !in_array($order['status'], ['shipped', 'out_for_delivery', 'delivered'], true)) {
+            $this->db->prepare(
+                'UPDATE orders SET status = :status, updated_at = NOW() WHERE id = :id'
+            )->execute(['status' => 'shipped', 'id' => $orderId]);
+        }
+
+        $this->db->prepare(
+            'INSERT INTO notifications (user_id, title, message, type, created_at)
+             VALUES (:user_id, :title, :message, :type, NOW())'
+        )->execute([
+            'user_id' => $order['user_id'],
+            'title' => 'Tracking available',
+            'message' => "Tracking for order {$order['order_number']}: {$trackingNumber}",
+            'type' => 'order',
+        ]);
+
+        $emailResult = ['sent' => false, 'message' => 'Email not requested.', 'track_url' => null];
+        if ($notifyCustomer) {
+            try {
+                $emailResult = (new OrderMailService($this->db))->notifyTrackingShared(
+                    $orderId,
+                    $trackingNumber,
+                    $carrier
+                );
+            } catch (Throwable $e) {
+                error_log('Tracking email failed: ' . $e->getMessage());
+                $emailResult = ['sent' => false, 'message' => 'Failed to send tracking email.', 'track_url' => null];
+            }
+        }
+
+        Response::jsonSuccess([
+            'delivery_id' => (int) $deliveryId,
+            'tracking_number' => $trackingNumber,
+            'carrier' => $carrier,
+            'email_sent' => (bool) ($emailResult['sent'] ?? false),
+            'email_message' => (string) ($emailResult['message'] ?? ''),
+            'track_url' => $emailResult['track_url'] ?? null,
+        ], 'Tracking shared.');
     }
 }

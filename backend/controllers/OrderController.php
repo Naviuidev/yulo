@@ -39,6 +39,23 @@ final class OrderController extends BaseController
         $payStmt->execute(['order_id' => $order['id']]);
         $order['payments'] = $payStmt->fetchAll();
 
+        $delStmt = $this->db->prepare(
+            'SELECT id, carrier, tracking_number, status, estimated_delivery, created_at
+             FROM deliveries WHERE order_id = :order_id ORDER BY id DESC LIMIT 1'
+        );
+        $delStmt->execute(['order_id' => $order['id']]);
+        $order['delivery'] = $delStmt->fetch() ?: null;
+
+        SchemaGuard::ensureTrackingFollowups($this->db);
+        $fuStmt = $this->db->prepare(
+            "SELECT id, status, subject, created_at, responded_at, tracking_number
+             FROM tracking_followups
+             WHERE order_id = :order_id AND user_id = :user_id
+             ORDER BY id DESC LIMIT 1"
+        );
+        $fuStmt->execute(['order_id' => $order['id'], 'user_id' => $userId]);
+        $order['tracking_followup'] = $fuStmt->fetch() ?: null;
+
         Response::jsonSuccess($order);
     }
 
@@ -46,6 +63,7 @@ final class OrderController extends BaseController
     {
         $input = $this->getJsonInput();
         $userId = $this->authUserId();
+        SchemaGuard::ensureCashfreePaymentMethod($this->db);
 
         $validator = Validator::make($input)->required('shipping_address_id')->integer('shipping_address_id');
         if ($validator->fails()) {
@@ -69,8 +87,9 @@ final class OrderController extends BaseController
 
         $subtotal = 0;
         foreach ($items as $item) {
-            $price = $item['variant_id']
-                ? ($item['variant_sale_price'] ?? $item['variant_price'])
+            $variantId = !empty($item['variant_id']) ? (int) $item['variant_id'] : null;
+            $price = $variantId
+                ? ($item['variant_sale_price'] ?? $item['variant_price'] ?? $item['sale_price'] ?? $item['price'])
                 : ($item['sale_price'] ?? $item['price']);
             $subtotal += (float) $price * (int) $item['quantity'];
         }
@@ -100,10 +119,10 @@ final class OrderController extends BaseController
         try {
             $this->db->beginTransaction();
 
-            $paymentMethod = $input['payment_method'] ?? 'cod';
-            $allowedMethods = ['phonepe', 'stripe', 'cod', 'upi'];
+            $paymentMethod = $input['payment_method'] ?? 'cashfree';
+            $allowedMethods = ['phonepe', 'stripe', 'cod', 'upi', 'cashfree'];
             if (!in_array($paymentMethod, $allowedMethods, true)) {
-                $paymentMethod = 'cod';
+                $paymentMethod = 'cashfree';
             }
 
             $orderNumber = $this->orderModel->generateOrderNumber();
@@ -138,26 +157,39 @@ final class OrderController extends BaseController
             );
 
             foreach ($items as $item) {
-                $price = $item['variant_id']
-                    ? ($item['variant_sale_price'] ?? $item['variant_price'])
+                $variantId = !empty($item['variant_id']) ? (int) $item['variant_id'] : null;
+                $price = $variantId
+                    ? ($item['variant_sale_price'] ?? $item['variant_price'] ?? $item['sale_price'] ?? $item['price'])
                     : ($item['sale_price'] ?? $item['price']);
                 $lineTotal = (float) $price * (int) $item['quantity'];
 
                 $itemStmt->execute([
                     'order_id' => $orderId,
-                    'product_id' => $item['product_id'],
-                    'variant_id' => $item['variant_id'],
-                    'quantity' => $item['quantity'],
+                    'product_id' => (int) $item['product_id'],
+                    'variant_id' => $variantId,
+                    'quantity' => (int) $item['quantity'],
                     'price' => $price,
                     'total' => $lineTotal,
                 ]);
 
-                if ($item['variant_id']) {
-                    $stockStmt = $this->db->prepare('UPDATE product_variants SET stock = stock - :qty WHERE id = :id AND stock >= :qty');
-                    $stockStmt->execute(['qty' => $item['quantity'], 'id' => $item['variant_id']]);
+                if ($variantId) {
+                    $stockStmt = $this->db->prepare(
+                        'UPDATE product_variants SET stock = stock - :qty WHERE id = :id AND stock >= :min_qty'
+                    );
+                    $stockStmt->execute([
+                        'qty' => (int) $item['quantity'],
+                        'min_qty' => (int) $item['quantity'],
+                        'id' => $variantId,
+                    ]);
                 } else {
-                    $stockStmt = $this->db->prepare('UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :qty');
-                    $stockStmt->execute(['qty' => $item['quantity'], 'id' => $item['product_id']]);
+                    $stockStmt = $this->db->prepare(
+                        'UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :min_qty'
+                    );
+                    $stockStmt->execute([
+                        'qty' => (int) $item['quantity'],
+                        'min_qty' => (int) $item['quantity'],
+                        'id' => (int) $item['product_id'],
+                    ]);
                 }
             }
 
@@ -170,14 +202,21 @@ final class OrderController extends BaseController
             $this->db->commit();
 
             Response::jsonSuccess([
+                'id' => $orderId,
                 'order_id' => $orderId,
                 'order_number' => $orderNumber,
                 'total' => $total,
             ], 'Order created successfully.', 201);
         } catch (Throwable $e) {
-            $this->db->rollBack();
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
             error_log('Order creation failed: ' . $e->getMessage());
-            Response::jsonError('Failed to create order.', 500);
+            $debug = filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            Response::jsonError(
+                $debug ? ('Failed to create order: ' . $e->getMessage()) : 'Failed to create order.',
+                500
+            );
         }
     }
 

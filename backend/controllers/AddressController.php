@@ -96,10 +96,17 @@ final class AddressController extends BaseController
         ]);
 
         if ($stmt->rowCount() === 0) {
-            Response::jsonError('Address not found.', 404);
+            // Unchanged values can report 0 rows; confirm ownership.
+            $exists = $this->db->prepare('SELECT id FROM addresses WHERE id = :id AND user_id = :user_id LIMIT 1');
+            $exists->execute(['id' => $id, 'user_id' => $userId]);
+            if (!$exists->fetch()) {
+                Response::jsonError('Address not found.', 404);
+            }
         }
 
-        Response::jsonSuccess(null, 'Address updated.');
+        $row = $this->db->prepare('SELECT * FROM addresses WHERE id = :id LIMIT 1');
+        $row->execute(['id' => $id]);
+        Response::jsonSuccess($row->fetch(), 'Address updated.');
     }
 
     private function normalizeAddressInput(array $input): array

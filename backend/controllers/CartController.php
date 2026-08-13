@@ -60,7 +60,7 @@ final class CartController extends BaseController
             Response::jsonError('Product not found.', 404);
         }
 
-        $variantId = $input['variant_id'] ?? null;
+        $variantId = !empty($input['variant_id']) ? (int) $input['variant_id'] : null;
         $price = $product['sale_price'] ?? $product['price'];
 
         if ($variantId) {

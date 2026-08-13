@@ -37,6 +37,19 @@ return [
         'env' => $_ENV['PHONEPE_ENV'] ?? 'sandbox',
         'callback_url' => $_ENV['PHONEPE_CALLBACK_URL'] ?? '',
     ],
+    'cashfree' => [
+        'app_id' => $_ENV['CASHFREE_APP_ID'] ?? '',
+        'secret_key' => $_ENV['CASHFREE_SECRET_KEY'] ?? '',
+        'env' => $_ENV['CASHFREE_ENV'] ?? 'sandbox',
+        'webhook_url' => $_ENV['CASHFREE_WEBHOOK_URL'] ?? '',
+    ],
+    'shiprocket' => [
+        'email' => $_ENV['SHIPROCKET_EMAIL'] ?? '',
+        'password' => $_ENV['SHIPROCKET_PASSWORD'] ?? '',
+        'channel_id' => $_ENV['SHIPROCKET_CHANNEL_ID'] ?? '',
+        'pickup_location' => $_ENV['SHIPROCKET_PICKUP_LOCATION'] ?? '',
+        'enabled' => filter_var($_ENV['SHIPROCKET_ENABLED'] ?? false, FILTER_VALIDATE_BOOLEAN),
+    ],
     'rate_limit' => [
         'max' => (int) ($_ENV['RATE_LIMIT_MAX'] ?? 100),
         'window' => (int) ($_ENV['RATE_LIMIT_WINDOW'] ?? 60),

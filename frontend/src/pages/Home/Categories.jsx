@@ -41,10 +41,10 @@ export default function Categories() {
           navigation
           freeMode
           spaceBetween={16}
-          slidesPerView={3.2}
+          slidesPerView={2}
           autoplay={{ delay: 3500, disableOnInteraction: false }}
           breakpoints={{
-            480: { slidesPerView: 4.2, spaceBetween: 16 },
+            480: { slidesPerView: 3.2, spaceBetween: 16 },
             768: { slidesPerView: 5.5, spaceBetween: 20 },
             1024: { slidesPerView: 7, spaceBetween: 24 },
           }}

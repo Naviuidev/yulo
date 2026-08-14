@@ -17,6 +17,14 @@ const brandService = {
     const res = await api.delete(`/admin/brands/${id}`);
     return extractData(res);
   },
+  uploadLogo: async (file) => {
+    const form = new FormData();
+    form.append('logo', file);
+    const res = await api.post('/admin/brands/upload-logo', form, {
+      headers: { 'Content-Type': undefined },
+    });
+    return extractData(res);
+  },
 };
 
 export default brandService;

@@ -123,9 +123,23 @@ export default function ProductCard({ product, index = 0 }) {
           <div className="product-card__brand">{product.brand_name}</div>
         )}
         <h3 className="product-card__name">{product.name}</h3>
-        {Number(product.average_rating) > 0 ? (
-          <RatingStars rating={product.average_rating} showValue />
-        ) : null}
+        <div className="product-card__category-row">
+          <span className="product-card__category">
+            {product.category_name || 'Uncategorized'}
+          </span>
+          <span className="product-card__rating">
+            {Number(product.average_rating) > 0 ? (
+              <>
+                <RatingStars rating={Number(product.average_rating)} showValue />
+                <span className="product-card__reviews">
+                  ({Number(product.review_count || 0)})
+                </span>
+              </>
+            ) : (
+              <span className="product-card__reviews product-card__reviews--empty">No reviews</span>
+            )}
+          </span>
+        </div>
         <div className="product-card__meta">
           <PriceDisplay price={product.price} salePrice={hasSale ? salePrice : null} />
           <span className={`product-card__stock ${stock > 0 ? '' : 'product-card__stock--out'}`}>

@@ -14,7 +14,6 @@ import Categories from './Categories';
 import Brands from './Brands';
 import CustomerReviews from './CustomerReviews';
 import InstagramGallery from './InstagramGallery';
-import BlogPreview from './BlogPreview';
 import Newsletter from './Newsletter';
 import FAQSection from './FAQSection';
 
@@ -25,7 +24,7 @@ export default function Home() {
 
   return (
     <>
-      <SEO title="Premium Eyewear" description="YULO — Wear YULO. Look Awesome. Premium spectacles, sunglasses, and optical frames." />
+      <SEO description="YULO — Wear YULO. Look Awesome. Fashion, accessories and more." />
       <OfferPopup />
       <HeroBanner />
       <Categories />
@@ -38,7 +37,6 @@ export default function Home() {
       <Brands />
       <CustomerReviews />
       <InstagramGallery />
-      <BlogPreview />
       <Newsletter />
       <FAQSection />
     </>

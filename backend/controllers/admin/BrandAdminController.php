@@ -56,4 +56,22 @@ final class BrandAdminController extends BaseController
         $stmt->execute(['status' => 'inactive', 'id' => $params['id']]);
         Response::jsonSuccess(null, 'Brand deactivated.');
     }
+
+    public function uploadLogo(array $params = []): void
+    {
+        if (empty($_FILES['logo']) && empty($_FILES['image'])) {
+            Response::jsonError('No logo file uploaded.', 422);
+        }
+
+        $file = $_FILES['logo'] ?? $_FILES['image'];
+        $uploader = new Uploader();
+        $result = $uploader->upload($file, 'brands');
+
+        if (!($result['success'] ?? false)) {
+            Response::jsonError($result['message'] ?? 'Upload failed.', 422);
+        }
+
+        $path = '/' . ltrim((string) $result['path'], '/');
+        Response::jsonSuccess(['path' => $path, 'url' => $path], 'Logo uploaded.');
+    }
 }

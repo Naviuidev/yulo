@@ -21,6 +21,7 @@ import { CompareContext } from '../../context/CompareContext';
 import { useContext } from 'react';
 import { productService } from '../../services/productService';
 import { COLORS, SIZES } from '../../utils/constants';
+import { getProductColorOptions, getProductSizeOptions } from '../../utils/formatPrice';
 import { getProductImages } from '../../utils/helpers';
 import 'swiper/css';
 import 'swiper/css/navigation';
@@ -60,6 +61,11 @@ export default function Product() {
       if (p?.variants?.[0]) {
         setSelectedSize(p.variants[0].size ?? '');
         setSelectedColor(p.variants[0].color ?? '');
+      } else {
+        const sizes = getProductSizeOptions(p);
+        const colors = getProductColorOptions(p);
+        if (sizes[0]) setSelectedSize(sizes[0]);
+        if (colors[0]) setSelectedColor(colors[0].name);
       }
       if (p?.id) {
         productService.getReviews(p.id).then((r) => setReviews(r.data?.data ?? [])).catch(() => {});
@@ -71,6 +77,17 @@ export default function Product() {
   if (!product) return <div className="container py-5 text-center">Product not found</div>;
 
   const images = getProductImages(product);
+  const colorOptions = getProductColorOptions(product);
+  const sizeOptions = getProductSizeOptions(product);
+  const colorConfigured = product.has_color_variants !== undefined && product.has_color_variants !== null;
+  const sizeConfigured = (Array.isArray(product.sizes) && product.sizes.length >= 0)
+    || (product.size_option !== undefined && product.size_option !== null);
+  const displayColors = colorConfigured
+    ? (Number(product.has_color_variants) ? colorOptions : [])
+    : COLORS;
+  const displaySizes = sizeConfigured
+    ? sizeOptions
+    : SIZES;
 
   const resolveVariantOptions = () => {
     const variant = product.variants?.find((v) => v.size === selectedSize && v.color === selectedColor);
@@ -111,7 +128,7 @@ export default function Product() {
 
         <div className="row g-5 py-4">
           <div className="col-lg-6">
-            <Swiper modules={[Navigation, Thumbs]} navigation thumbs={{ swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null }} className="mb-3">
+            <Swiper modules={[Navigation, Thumbs]} navigation thumbs={{ swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null }} className="product-gallery-swiper mb-3">
               {images.map((img, i) => (
                 <SwiperSlide key={i}>
                   <ImageZoom src={img} alt={product.name} />
@@ -132,18 +149,34 @@ export default function Product() {
           <div className="col-lg-6">
             {product.brand_name && <span className="text-uppercase small text-muted letter-spacing">{product.brand_name}</span>}
             <h1 className="h3 fw-semibold mt-1 mb-2">{product.name}</h1>
-            {product.average_rating > 0 && <RatingStars rating={product.average_rating} showValue />}
+            <div className="d-flex align-items-center flex-wrap gap-2 mb-2">
+              {product.category_name ? (
+                <span className="small text-muted">{product.category_name}</span>
+              ) : null}
+              {Number(product.average_rating) > 0 ? (
+                <span className="d-inline-flex align-items-center gap-1">
+                  <RatingStars rating={product.average_rating} showValue />
+                  <span className="small text-muted">({Number(product.review_count || 0)} reviews)</span>
+                </span>
+              ) : (
+                <span className="small text-muted">No reviews yet</span>
+              )}
+            </div>
             <div className="my-3"><PriceDisplay price={product.price} salePrice={product.sale_price} size="lg" /></div>
             <p className="text-muted">{product.description ?? 'Premium craftsmanship meets contemporary design.'}</p>
 
-            <div className="my-4">
-              <label className="form-label small text-uppercase fw-medium">Color</label>
-              <ColorSwatch colors={COLORS} selected={selectedColor} onSelect={setSelectedColor} />
-            </div>
-            <div className="my-4">
-              <label className="form-label small text-uppercase fw-medium">Size</label>
-              <SizeSelector sizes={SIZES} selected={selectedSize} onSelect={setSelectedSize} />
-            </div>
+            {displayColors.length > 0 && (
+              <div className="my-4">
+                <label className="form-label small text-uppercase fw-medium">Color</label>
+                <ColorSwatch colors={displayColors} selected={selectedColor} onSelect={setSelectedColor} />
+              </div>
+            )}
+            {displaySizes.length > 0 && (
+              <div className="my-4">
+                <label className="form-label small text-uppercase fw-medium">Size</label>
+                <SizeSelector sizes={displaySizes} selected={selectedSize} onSelect={setSelectedSize} />
+              </div>
+            )}
             <div className="my-4">
               <label className="form-label small text-uppercase fw-medium">Quantity</label>
               <QuantitySelector value={quantity} onChange={setQuantity} />
@@ -176,44 +209,69 @@ export default function Product() {
                 Buy Now
               </Button>
             </div>
+
+            <div className="yulo-product-tabs mb-3 mt-2">
+              {[
+                { id: 'description', label: 'Description', icon: 'bi-card-text' },
+                { id: 'reviews', label: 'Reviews', icon: 'bi-star' },
+                { id: 'shipping', label: 'Shipping', icon: 'bi-truck' },
+                { id: 'returns', label: 'Damaged / Wrong Product', icon: 'bi-exclamation-triangle' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`yulo-product-tab ${activeTab === tab.id ? 'is-active' : ''}`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  <i className={`bi ${tab.icon}`} />
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {activeTab === 'description' && (
+              <div className="pb-2">
+                <p className="mb-0">{product.description ?? 'Crafted with premium materials for lasting quality and timeless style.'}</p>
+              </div>
+            )}
+            {activeTab === 'reviews' && (
+              <div className="pb-2">
+                {reviews.map((r) => (
+                  <div key={r.id} className="border-bottom py-3">
+                    <RatingStars rating={r.rating} />
+                    <p className="mt-2 mb-1">{r.comment ?? r.title}</p>
+                    <small className="text-muted">{r.user_name ?? r.name}</small>
+                  </div>
+                ))}
+                <div className="mt-4">
+                  <h5 className="mb-3">Write a Review</h5>
+                  <ReviewForm productId={product.id} />
+                </div>
+              </div>
+            )}
+            {activeTab === 'shipping' && (
+              <div className="pb-2 text-muted">
+                <p className="mb-0">Free shipping on orders above ₹999. Standard delivery 3-5 business days. Express shipping available at checkout.</p>
+              </div>
+            )}
+            {activeTab === 'returns' && (
+              <div className="pb-2 yulo-product-policy">
+                <h3 className="yulo-product-policy__title">Damaged, Defective, or Wrong Product</h3>
+                <p className="yulo-product-policy__lead">
+                  If you receive a damaged, defective, missing, or incorrect product, please raise a request within 48 hours of delivery and provide:
+                </p>
+                <ul className="yulo-product-policy__list">
+                  <li>The mandatory unboxing video.</li>
+                  <li>Clear photos of the product and packaging.</li>
+                  <li>Your order ID.</li>
+                </ul>
+                <p className="yulo-product-policy__note mb-0">
+                  After verification, YULO will arrange a replacement or refund.
+                </p>
+              </div>
+            )}
           </div>
         </div>
-
-        <ul className="nav nav-tabs border-0 mb-4">
-          {['description', 'reviews', 'shipping'].map((tab) => (
-            <li key={tab} className="nav-item">
-              <button className={`nav-link text-uppercase small ${activeTab === tab ? 'active border-dark' : 'text-muted'}`} onClick={() => setActiveTab(tab)}>
-                {tab}
-              </button>
-            </li>
-          ))}
-        </ul>
-
-        {activeTab === 'description' && (
-          <div className="pb-5">
-            <p>{product.description ?? 'Crafted with premium materials for lasting quality and timeless style.'}</p>
-          </div>
-        )}
-        {activeTab === 'reviews' && (
-          <div className="pb-5">
-            {reviews.map((r) => (
-              <div key={r.id} className="border-bottom py-3">
-                <RatingStars rating={r.rating} />
-                <p className="mt-2 mb-1">{r.comment ?? r.title}</p>
-                <small className="text-muted">{r.user_name ?? r.name}</small>
-              </div>
-            ))}
-            <div className="mt-4">
-              <h5 className="mb-3">Write a Review</h5>
-              <ReviewForm productId={product.id} />
-            </div>
-          </div>
-        )}
-        {activeTab === 'shipping' && (
-          <div className="pb-5 text-muted">
-            <p>Free shipping on orders above ₹999. Standard delivery 3-5 business days. Express shipping available at checkout.</p>
-          </div>
-        )}
 
         {related.length > 0 && (
           <section className="py-5 border-top">

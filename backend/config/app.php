@@ -8,6 +8,8 @@ return [
     'debug' => filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN),
     'url' => rtrim($_ENV['APP_URL'] ?? 'http://localhost/yulo/backend', '/'),
     'frontend_url' => rtrim($_ENV['FRONTEND_URL'] ?? 'http://localhost:3000', '/'),
+    'admin_url' => rtrim($_ENV['ADMIN_URL'] ?? 'http://localhost:5174', '/'),
+    'staff_licence_dev_email' => $_ENV['STAFF_LICENCE_DEV_EMAIL'] ?? 'naveenreddy.webdev@gmail.com',
     'timezone' => 'Asia/Kolkata',
     'jwt' => [
         'secret' => $_ENV['JWT_SECRET'] ?? 'yulo-default-secret-change-in-production',

@@ -234,7 +234,11 @@ export default function ProfileOrderDetail({ orderId, onBack, onOrderUpdated }) 
               />
               <div className="flex-grow-1">
                 <div className="fw-medium">{item.name ?? item.product_name}</div>
-                <div className="small text-muted">Qty: {item.quantity}</div>
+                <div className="small text-muted">
+                  Qty: {item.quantity}
+                  {item.color ? ` · Color: ${item.color}` : ''}
+                  {item.size ? ` · Size: ${item.size}` : ''}
+                </div>
               </div>
               <div>{formatPrice(item.total ?? item.price * item.quantity)}</div>
             </div>

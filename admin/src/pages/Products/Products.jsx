@@ -53,6 +53,25 @@ const Products = () => {
     { key: 'category_name', label: 'Category', render: (r) => r.category_name || '—' },
     { key: 'price', label: 'Price', render: (r) => formatCurrency(r.price) },
     { key: 'stock', label: 'Stock', render: (r) => <span className={r.stock <= 5 ? 'text-danger fw-medium' : ''}>{r.stock}</span> },
+    {
+      key: 'rating_percent',
+      label: 'Rating %',
+      render: (r) => {
+        const pct = Number(r.rating_percent ?? 0);
+        const avg = Number(r.average_rating ?? 0);
+        if (!Number(r.review_count)) return '—';
+        return (
+          <span title={`${avg.toFixed(1)} / 5`}>
+            {pct}%
+          </span>
+        );
+      },
+    },
+    {
+      key: 'review_count',
+      label: 'Reviews',
+      render: (r) => Number(r.review_count ?? 0),
+    },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     {
       key: 'actions',

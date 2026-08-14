@@ -17,6 +17,16 @@ import './styles/global.css';
 import './styles/components.css';
 import './styles/home.css';
 
+function ToastIcon({ type }) {
+  if (type === 'success') {
+    return <i className="bi bi-check-circle-fill yulo-toast-mark yulo-toast-mark--success" aria-hidden="true" />;
+  }
+  if (type === 'error') {
+    return <i className="bi bi-x-circle-fill yulo-toast-mark yulo-toast-mark--error" aria-hidden="true" />;
+  }
+  return false;
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <HelmetProvider>
@@ -27,7 +37,19 @@ createRoot(document.getElementById('root')).render(
               <CompareProvider>
                 <UIProvider>
                   <App />
-                  <ToastContainer position="bottom-right" autoClose={3000} hideProgressBar theme="light" />
+                  <ToastContainer
+                    position="top-center"
+                    autoClose={3000}
+                    hideProgressBar
+                    newestOnTop
+                    closeOnClick
+                    pauseOnHover
+                    theme="colored"
+                    icon={ToastIcon}
+                    className="yulo-toast-container"
+                    toastClassName="yulo-toast"
+                    bodyClassName="yulo-toast__body"
+                  />
                 </UIProvider>
               </CompareProvider>
             </WishlistProvider>

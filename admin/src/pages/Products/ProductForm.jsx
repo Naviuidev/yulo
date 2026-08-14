@@ -13,6 +13,20 @@ import { slugify } from '../../utils/formatters';
 import { resolveMediaUrl } from '../../utils/media';
 
 const EMPTY_IMAGES = ['', '', ''];
+const EMPTY_COLORS = [
+  { name: '', hex: '#000000' },
+  { name: '', hex: '#FFFFFF' },
+  { name: '', hex: '#956514' },
+  { name: '', hex: '#1B2838' },
+];
+
+const SIZE_OPTIONS = [
+  { value: 'sm', label: 'SM' },
+  { value: 'm', label: 'M' },
+  { value: 'l', label: 'L' },
+  { value: 'xl', label: 'XL' },
+  { value: 'xxl', label: 'XXL' },
+];
 
 const ProductForm = () => {
   const { id } = useParams();
@@ -25,17 +39,25 @@ const ProductForm = () => {
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [sections, setSections] = useState([]);
-  const [sectionIds, setSectionIds] = useState([]);
+  const [sectionId, setSectionId] = useState('');
+  const [colors, setColors] = useState(EMPTY_COLORS);
+  const [selectedSizes, setSelectedSizes] = useState([]);
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
       name: '', slug: '', description: '', short_description: '', sku: '',
       price: '', sale_price: '', stock: 0, category_id: '', brand_id: '',
-      status: 'active', is_featured: false,
+      status: 'active', is_featured: false, gst_applicable: true,
+      custom_shipping: false, shipping_price: '',
+      has_color_variants: false, enable_sizes: false,
     },
   });
 
   const name = watch('name');
+  const gstApplicable = watch('gst_applicable');
+  const customShipping = watch('custom_shipping');
+  const hasColorVariants = watch('has_color_variants');
+  const enableSizes = watch('enable_sizes');
 
   useEffect(() => {
     if (!isEdit && name) setValue('slug', slugify(name));
@@ -75,8 +97,30 @@ const ProductForm = () => {
           brand_id: product.brand_id || '',
           status: product.status || 'active',
           is_featured: !!product.is_featured,
+          gst_applicable: product.gst_applicable === undefined ? true : !!Number(product.gst_applicable),
+          custom_shipping: !!Number(product.custom_shipping),
+          shipping_price: product.shipping_price ?? '',
+          has_color_variants: !!Number(product.has_color_variants),
+          enable_sizes: false,
         });
-        setSectionIds((product.section_ids || []).map((sid) => String(sid)));
+        const ids = (product.section_ids || []).map((sid) => String(sid));
+        setSectionId(ids[0] || '');
+        const loadedColors = Array.isArray(product.colors) ? product.colors : [];
+        setColors(
+          [...loadedColors, ...EMPTY_COLORS]
+            .slice(0, 4)
+            .map((c, i) => ({
+              name: c?.name || '',
+              hex: c?.hex || EMPTY_COLORS[i].hex,
+            }))
+        );
+        let loadedSizes = Array.isArray(product.sizes) ? product.sizes.map((s) => String(s).toLowerCase()) : [];
+        if (loadedSizes.length === 0 && product.size_option && product.size_option !== 'none') {
+          loadedSizes = [String(product.size_option).toLowerCase()];
+        }
+        loadedSizes = loadedSizes.filter((s) => SIZE_OPTIONS.some((o) => o.value === s));
+        setSelectedSizes(loadedSizes);
+        setValue('enable_sizes', loadedSizes.length > 0);
         const loaded = (product.images || [])
           .map((img) => img.image_path || img.url || '')
           .filter(Boolean)
@@ -100,6 +144,20 @@ const ProductForm = () => {
     });
   };
 
+  const setColorAt = (index, patch) => {
+    setColors((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], ...patch };
+      return next;
+    });
+  };
+
+  const toggleSize = (value) => {
+    setSelectedSizes((prev) => (
+      prev.includes(value) ? prev.filter((s) => s !== value) : [...prev, value]
+    ));
+  };
+
   const handleImageUpload = async (index, e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -120,6 +178,22 @@ const ProductForm = () => {
   };
 
   const onSubmit = async (data) => {
+    if (data.custom_shipping && (!data.shipping_price || Number(data.shipping_price) < 0)) {
+      toast.error('Enter a shipping price when custom shipping is enabled');
+      return;
+    }
+    if (data.has_color_variants) {
+      const filled = colors.filter((c) => c.name.trim());
+      if (filled.length === 0) {
+        toast.error('Add at least one color name (up to 4)');
+        return;
+      }
+    }
+    if (data.enable_sizes && selectedSizes.length === 0) {
+      toast.error('Select at least one size, or turn off sizes');
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -130,9 +204,22 @@ const ProductForm = () => {
         category_id: data.category_id ? Number(data.category_id) : null,
         brand_id: data.brand_id ? Number(data.brand_id) : null,
         is_featured: !!data.is_featured,
+        gst_applicable: !!data.gst_applicable,
+        custom_shipping: !!data.custom_shipping,
+        shipping_price: data.custom_shipping ? Number(data.shipping_price) : null,
+        has_color_variants: !!data.has_color_variants,
+        colors: data.has_color_variants
+          ? colors.filter((c) => c.name.trim()).slice(0, 4).map((c) => ({
+              name: c.name.trim(),
+              hex: c.hex || '#000000',
+            }))
+          : [],
+        sizes: data.enable_sizes ? selectedSizes : [],
         images: images.map((img) => img.trim()).filter(Boolean).slice(0, 3),
-        section_ids: sectionIds.map((sid) => Number(sid)).filter((sid) => sid > 0),
+        section_ids: sectionId ? [Number(sectionId)] : [],
       };
+      delete payload.enable_sizes;
+      delete payload.size_option;
       if (isEdit) {
         await productService.update(id, payload);
         toast.success('Product updated');
@@ -142,9 +229,9 @@ const ProductForm = () => {
       }
       navigate('/products');
     } catch (err) {
-      const data = err.response?.data;
-      const fieldErrors = data?.errors;
-      let detail = data?.message || 'Save failed';
+      const res = err.response?.data;
+      const fieldErrors = res?.errors;
+      let detail = res?.message || 'Save failed';
       if (fieldErrors && typeof fieldErrors === 'object') {
         const first = Object.values(fieldErrors).flat().find(Boolean);
         if (first) detail = String(first);
@@ -186,7 +273,7 @@ const ProductForm = () => {
 
           <div className="col-12">
             <label className="form-label mb-2">Product Images (up to 3)</label>
-            <p className="form-text mt-0 mb-3">Image 1 is the primary image. These appear as a slider on product cards and the product page.</p>
+            <p className="form-text mt-0 mb-3">Image 1 is the primary image.</p>
             <div className="row g-3">
               {images.map((image, index) => (
                 <div className="col-md-4" key={index}>
@@ -245,6 +332,7 @@ const ProductForm = () => {
             <label className="form-label">Sale Price</label>
             <input type="number" step="0.01" className="form-control" {...register('sale_price')} />
           </div>
+
           <div className="col-md-3">
             <label className="form-label">Stock</label>
             <input type="number" className="form-control" {...register('stock')} />
@@ -271,32 +359,149 @@ const ProductForm = () => {
               <option value="archived">Archived</option>
             </select>
           </div>
-          <div className="col-md-6">
-            <label className="form-label">Homepage section(s)</label>
-            <select
-              className="form-select"
-              multiple
-              size={Math.min(5, Math.max(3, sections.length || 3))}
-              value={sectionIds}
-              onChange={(e) => {
-                const selected = Array.from(e.target.selectedOptions).map((o) => o.value);
-                setSectionIds(selected);
-              }}
-            >
-              {sections.length === 0 ? (
-                <option value="" disabled>No sections — create them under Brands → Sections UI</option>
-              ) : (
-                sections.map((s) => (
-                  <option key={s.id} value={String(s.id)}>{s.name}</option>
-                ))
-              )}
-            </select>
-            <div className="form-text">
-              Hold Cmd/Ctrl to select multiple. Product appears in those homepage sections (New Arrivals, Trending, etc.).
+
+          {/* Options row: GST + Homepage */}
+          <div className="col-12">
+            <div className="yulo-option-grid">
+              <div className={`yulo-option-card ${gstApplicable ? 'is-on' : ''}`}>
+                <div className="yulo-option-card__head">
+                  <div>
+                    <div className="yulo-option-card__title">GST (18%)</div>
+                    <div className="yulo-option-card__hint">
+                      {gstApplicable ? 'GST will be added at checkout' : 'No GST on this product'}
+                    </div>
+                  </div>
+                  <div className="form-check form-switch m-0">
+                    <input type="checkbox" className="form-check-input" id="gst_applicable" {...register('gst_applicable')} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="yulo-option-card">
+                <div className="yulo-option-card__title mb-2">Homepage section</div>
+                <select
+                  className="form-select"
+                  value={sectionId}
+                  onChange={(e) => setSectionId(e.target.value)}
+                >
+                  <option value="">None</option>
+                  {sections.map((s) => (
+                    <option key={s.id} value={String(s.id)}>{s.name}</option>
+                  ))}
+                </select>
+                <div className="form-text mb-0 mt-2">Shows this product in the selected homepage section.</div>
+              </div>
             </div>
           </div>
-          <div className="col-md-6 d-flex align-items-end">
-            <div className="form-check mb-2">
+
+          {/* Shipping */}
+          <div className="col-12">
+            <div className={`yulo-option-card ${customShipping ? 'is-on' : ''}`}>
+              <div className="yulo-option-card__head">
+                <div>
+                  <div className="yulo-option-card__title">Custom shipping price</div>
+                  <div className="yulo-option-card__hint">
+                    {customShipping
+                      ? 'Use the shipping amount below for this product'
+                      : 'Off = default cart shipping (free over ₹999)'}
+                  </div>
+                </div>
+                <div className="form-check form-switch m-0">
+                  <input type="checkbox" className="form-check-input" id="custom_shipping" {...register('custom_shipping')} />
+                </div>
+              </div>
+              {customShipping ? (
+                <div className="mt-3" style={{ maxWidth: 280 }}>
+                  <label className="form-label" htmlFor="shipping_price">Shipping price (₹)</label>
+                  <input
+                    id="shipping_price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="form-control"
+                    placeholder="e.g. 49"
+                    {...register('shipping_price')}
+                  />
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Colors + Size */}
+          <div className="col-12">
+            <div className="yulo-option-grid">
+              <div className={`yulo-option-card ${hasColorVariants ? 'is-on' : ''}`}>
+                <div className="yulo-option-card__head">
+                  <div>
+                    <div className="yulo-option-card__title">Color variants</div>
+                    <div className="yulo-option-card__hint">Up to 4 colors on the product page</div>
+                  </div>
+                  <div className="form-check form-switch m-0">
+                    <input type="checkbox" className="form-check-input" id="has_color_variants" {...register('has_color_variants')} />
+                  </div>
+                </div>
+                {hasColorVariants ? (
+                  <div className="mt-3">
+                    <div className="row g-2">
+                      {colors.map((color, index) => (
+                        <div className="col-md-6" key={index}>
+                          <div className="yulo-color-slot">
+                            <input
+                              type="color"
+                              className="yulo-color-slot__picker"
+                              value={color.hex || '#000000'}
+                              onChange={(e) => setColorAt(index, { hex: e.target.value })}
+                              title={`Color ${index + 1}`}
+                            />
+                            <input
+                              className="form-control form-control-sm"
+                              placeholder={`Color ${index + 1} name`}
+                              value={color.name}
+                              onChange={(e) => setColorAt(index, { name: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className={`yulo-option-card ${enableSizes ? 'is-on' : ''}`}>
+                <div className="yulo-option-card__head">
+                  <div>
+                    <div className="yulo-option-card__title">Sizes</div>
+                    <div className="yulo-option-card__hint">
+                      {enableSizes ? 'Select one or more sizes for the product page' : 'Off = hide size selector'}
+                    </div>
+                  </div>
+                  <div className="form-check form-switch m-0">
+                    <input type="checkbox" className="form-check-input" id="enable_sizes" {...register('enable_sizes')} />
+                  </div>
+                </div>
+                {enableSizes ? (
+                  <div className="yulo-size-chips mt-3">
+                    {SIZE_OPTIONS.map((opt) => {
+                      const active = selectedSizes.includes(opt.value);
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          className={`yulo-size-chip ${active ? 'is-active' : ''}`}
+                          onClick={() => toggleSize(opt.value)}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="col-12">
+            <div className="form-check">
               <input type="checkbox" className="form-check-input" id="featured" {...register('is_featured')} />
               <label className="form-check-label" htmlFor="featured">Featured product</label>
             </div>

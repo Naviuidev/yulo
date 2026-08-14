@@ -6,13 +6,13 @@ import QuantitySelector from '../../components/ui/QuantitySelector';
 import PriceDisplay from '../../components/ui/PriceDisplay';
 import Button from '../../components/ui/Button';
 import useCart from '../../hooks/useCart';
-import { formatPrice, getCartItemUnitPrice } from '../../utils/formatPrice';
+import { formatPrice, getCartGstTax, getCartItemUnitPrice, getCartShipping } from '../../utils/formatPrice';
 import { getProductImage } from '../../utils/helpers';
 
 export default function Cart() {
   const { items, subtotal, updateQuantity, removeItem, clearCart } = useCart();
-  const shipping = subtotal >= 999 ? 0 : 99;
-  const tax = Math.round(subtotal * 0.18 * 100) / 100;
+  const shipping = getCartShipping(items, subtotal);
+  const tax = getCartGstTax(items);
   const total = Math.round((subtotal + shipping + tax) * 100) / 100;
 
   return (
@@ -72,8 +72,8 @@ export default function Cart() {
                   <span>{shipping === 0 ? 'Free' : formatPrice(shipping, 'INR', 2)}</span>
                 </div>
                 <div className="d-flex justify-content-between mb-2 text-muted small">
-                  <span>GST (18%)</span>
-                  <span>{formatPrice(tax, 'INR', 2)}</span>
+                  <span>{tax > 0 ? 'GST (18%)' : 'GST'}</span>
+                  <span>{tax > 0 ? formatPrice(tax, 'INR', 2) : 'Not applicable'}</span>
                 </div>
                 <hr />
                 <div className="d-flex justify-content-between fw-semibold mb-4">

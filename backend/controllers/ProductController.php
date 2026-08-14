@@ -47,7 +47,10 @@ final class ProductController extends BaseController
 
         $product['images'] = $this->productModel->getImages((int) $product['id']);
         $product['variants'] = $this->productModel->getVariants((int) $product['id']);
-        $product['average_rating'] = $this->reviewModel->averageRating((int) $product['id']);
+        $stats = $this->reviewModel->statsForProduct((int) $product['id']);
+        $product['average_rating'] = $stats['average_rating'];
+        $product['review_count'] = $stats['review_count'];
+        $product['rating_percent'] = $stats['rating_percent'];
 
         $userId = $this->authUserId();
         if ($userId) {

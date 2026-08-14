@@ -17,19 +17,20 @@ final class CouponController extends BaseController
     public function validate(array $params = []): void
     {
         $input = $this->getJsonInput();
+        $code = trim((string) ($input['code'] ?? ''));
 
-        if (empty($input['code'])) {
+        if ($code === '') {
             Response::jsonError('Coupon code is required.', 422);
         }
 
         $subtotal = (float) ($input['subtotal'] ?? 0);
-        $coupon = $this->couponModel->findByCode($input['code']);
+        $coupon = $this->couponModel->findByCode($code);
 
         if (!$coupon) {
             Response::jsonError('Invalid coupon code.', 404);
         }
 
-        if ($coupon['expires_at'] && strtotime($coupon['expires_at']) < time()) {
+        if ($this->couponModel->isExpired($coupon)) {
             Response::jsonError('Coupon has expired.', 422);
         }
 
@@ -37,23 +38,31 @@ final class CouponController extends BaseController
             Response::jsonError('Coupon usage limit reached.', 422);
         }
 
-        if ($subtotal < (float) $coupon['min_order_amount']) {
-            Response::jsonError('Minimum order amount not met.', 422);
+        $minOrder = (float) ($coupon['min_order_amount'] ?? 0);
+        if ($subtotal < $minOrder) {
+            Response::jsonError(
+                'Minimum order amount of ₹' . number_format($minOrder, 2) . ' required for this coupon.',
+                422
+            );
         }
 
-        $discount = $coupon['type'] === 'percentage'
-            ? round($subtotal * ($coupon['value'] / 100), 2)
-            : (float) $coupon['value'];
-
-        if ($coupon['max_discount'] !== null) {
-            $discount = min($discount, (float) $coupon['max_discount']);
+        $discount = $this->couponModel->calculateDiscount($coupon, $subtotal);
+        if ($discount <= 0) {
+            Response::jsonError('Coupon does not apply to this order.', 422);
         }
+
+        $type = (string) $coupon['type'];
+        $value = (float) $coupon['value'];
 
         Response::jsonSuccess([
             'code' => $coupon['code'],
-            'type' => $coupon['type'],
-            'value' => $coupon['value'],
-            'discount' => min($discount, $subtotal),
+            'type' => $type,
+            'value' => $value,
+            'discount' => $discount,
+            'discount_amount' => $discount,
+            'label' => $type === 'percentage'
+                ? rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.') . '% off'
+                : '₹' . number_format($value, 2) . ' off',
         ], 'Coupon is valid.');
     }
 }

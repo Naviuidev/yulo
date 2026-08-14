@@ -2,36 +2,60 @@ import { Link } from 'react-router-dom';
 import SEO from '../../components/common/SEO';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import Button from '../../components/ui/Button';
-import { BRAND_NAME, BRAND_TAGLINE, PLACEHOLDER_IMAGES } from '../../utils/constants';
+import { BRAND_NAME, PLACEHOLDER_IMAGES } from '../../utils/constants';
 
 export default function About() {
   return (
     <>
-      <SEO title="About Us" description="The story behind YULO premium fashion." />
+      <SEO
+        title="About Us"
+        description="Wear YULO, Look Awesome. Contemporary fashion, eyewear and accessories at affordable prices."
+      />
       <div className="page-header">
         <div className="container">
           <Breadcrumb items={[{ label: 'About' }]} />
-          <h1>About {BRAND_NAME}</h1>
+          <h1>About Us</h1>
         </div>
       </div>
 
       <section className="container py-5">
-        <div className="row g-5 align-items-center">
+        <div className="row g-5 align-items-start">
           <div className="col-lg-6">
-            <img src={PLACEHOLDER_IMAGES[0]} alt="About YULO" className="w-100" style={{ aspectRatio: '4/5', objectFit: 'cover' }} />
+            <img
+              src={PLACEHOLDER_IMAGES[0]}
+              alt="About YULO"
+              className="w-100"
+              style={{ aspectRatio: '4/5', objectFit: 'cover' }}
+            />
           </div>
           <div className="col-lg-6">
-            <h2 className="section-title">{BRAND_TAGLINE}</h2>
+            <h2 className="section-title">Wear YULO, Look Awesome.</h2>
             <div className="gold-line gold-line-left" />
+
             <p className="text-muted mb-4">
-              YULO was born from a simple belief: fashion should be effortless, refined, and accessible.
-              We curate collections that blend timeless silhouettes with contemporary edge — pieces designed
-              to elevate your everyday wardrobe.
+              YULO is a contemporary fashion and lifestyle brand built around one simple idea — looking
+              good should never have to cost more.
             </p>
             <p className="text-muted mb-4">
-              Every garment is selected for quality, craftsmanship, and versatility. From premium fabrics
-              to meticulous finishing, we hold ourselves to the highest standards.
+              We bring together fashion, eyewear and accessories that combine modern style, everyday
+              comfort and quality at affordable prices. Our collection currently features a curated
+              range of men’s wear and accessories, including T-shirts, shirts, trendy eyewear,
+              wristbands, belts, caps and more. Women’s wear and accessories are also part of the
+              YULO collection.
             </p>
+            <p className="text-muted mb-4">
+              We carefully select our products with an emphasis on quality, design and value, so you
+              can discover fashionable pieces at prices that offer genuine value compared with the
+              market.
+            </p>
+            <p className="text-muted mb-4">
+              Whether you are looking for everyday essentials or something to complete your look,
+              YULO makes it easy to find styles that fit your personality and your budget.
+            </p>
+            <p className="fw-medium mb-4">
+              YULO — Wear YULO, Look Awesome.
+            </p>
+
             <Link to="/shop"><Button>Explore Collection</Button></Link>
           </div>
         </div>

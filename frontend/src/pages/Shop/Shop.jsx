@@ -79,7 +79,15 @@ export default function Shop() {
       <div className="page-header">
         <div className="container">
           <Breadcrumb items={[{ label: 'Shop' }]} />
-          <h1>Shop</h1>
+          <h1>{filters.search ? `Results for “${filters.search}”` : 'Shop'}</h1>
+          {filters.search ? (
+            <p className="text-muted small mb-0 mt-2">
+              Showing matches for your search.{' '}
+              <button type="button" className="btn btn-link btn-sm p-0 align-baseline" onClick={() => updateFilter('search', '')}>
+                Clear search
+              </button>
+            </p>
+          ) : null}
         </div>
       </div>
 

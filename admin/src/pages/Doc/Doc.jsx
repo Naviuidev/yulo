@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import PageHeader from '../../components/common/PageHeader';
+import PagePasswordGate from '../../components/common/PagePasswordGate';
 import { DOC_CATEGORIES, DOC_ITEMS } from './docData';
 
 function matchesQuery(item, q) {
@@ -154,84 +155,91 @@ export default function Doc() {
   }, [query]);
 
   return (
-    <div className="yulo-doc">
-      <PageHeader
-        title="Project Doc"
-        subtitle="Complete guide — pages, images, database files, APIs, and next steps"
-      />
-
-      <div className="yulo-doc-search">
-        <i className="bi bi-search" />
-        <input
-          type="search"
-          className="form-control"
-          placeholder="Search pages, files, images, database, API, next steps…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          autoFocus
+    <PagePasswordGate
+      id="doc"
+      password="Hosur@1998"
+      title="Project Doc locked"
+      message="Enter the documentation password to view project guides and next steps."
+    >
+      <div className="yulo-doc">
+        <PageHeader
+          title="Project Doc"
+          subtitle="Complete guide — pages, images, database files, APIs, and next steps"
         />
-        {query && (
-          <button type="button" className="yulo-doc-search__clear" onClick={() => setQuery('')}>
-            <i className="bi bi-x-lg" />
-          </button>
-        )}
-      </div>
 
-      <div className="yulo-doc-cats">
-        {DOC_CATEGORIES.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className={`yulo-doc-cat ${category === c.id ? 'is-active' : ''}`}
-            onClick={() => setCategory(c.id)}
-          >
-            <i className={`bi ${c.icon}`} />
-            <span>{c.label}</span>
-            <em>{counts[c.id] ?? 0}</em>
-          </button>
-        ))}
-      </div>
-
-      <div className="yulo-doc-toolbar">
-        <span>
-          Showing <strong>{filtered.length}</strong> of {DOC_ITEMS.length} topics
-        </span>
-        <div className="d-flex gap-2">
-          <button
-            type="button"
-            className="btn btn-sm btn-outline-dark"
-            onClick={() => setOpenId(filtered[0]?.id || null)}
-            disabled={!filtered.length}
-          >
-            Expand first
-          </button>
-          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setOpenId(null)}>
-            Collapse
-          </button>
+        <div className="yulo-doc-search">
+          <i className="bi bi-search" />
+          <input
+            type="search"
+            className="form-control"
+            placeholder="Search pages, files, images, database, API, next steps…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoFocus
+          />
+          {query && (
+            <button type="button" className="yulo-doc-search__clear" onClick={() => setQuery('')}>
+              <i className="bi bi-x-lg" />
+            </button>
+          )}
         </div>
-      </div>
 
-      {filtered.length === 0 ? (
-        <div className="yulo-doc-empty">
-          <i className="bi bi-search display-6 d-block mb-2" />
-          No topics match “{query}”. Try “hero”, “seed.sql”, “checkout”, or “glasses”.
-        </div>
-      ) : (
-        <div className="yulo-doc-list">
-          {filtered.map((item) => (
-            <DocCard
-              key={item.id}
-              item={item}
-              open={openId === item.id}
-              onToggle={() => setOpenId((id) => (id === item.id ? null : item.id))}
-            />
+        <div className="yulo-doc-cats">
+          {DOC_CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={`yulo-doc-cat ${category === c.id ? 'is-active' : ''}`}
+              onClick={() => setCategory(c.id)}
+            >
+              <i className={`bi ${c.icon}`} />
+              <span>{c.label}</span>
+              <em>{counts[c.id] ?? 0}</em>
+            </button>
           ))}
         </div>
-      )}
 
-      <div className="yulo-doc-footnote">
-        Content source: <code>admin/src/pages/Doc/docData.js</code> — update this file as the project grows.
+        <div className="yulo-doc-toolbar">
+          <span>
+            Showing <strong>{filtered.length}</strong> of {DOC_ITEMS.length} topics
+          </span>
+          <div className="d-flex gap-2">
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-dark"
+              onClick={() => setOpenId(filtered[0]?.id || null)}
+              disabled={!filtered.length}
+            >
+              Expand first
+            </button>
+            <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setOpenId(null)}>
+              Collapse
+            </button>
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="yulo-doc-empty">
+            <i className="bi bi-search display-6 d-block mb-2" />
+            No topics match “{query}”. Try “hero”, “seed.sql”, “checkout”, or “glasses”.
+          </div>
+        ) : (
+          <div className="yulo-doc-list">
+            {filtered.map((item) => (
+              <DocCard
+                key={item.id}
+                item={item}
+                open={openId === item.id}
+                onToggle={() => setOpenId((id) => (id === item.id ? null : item.id))}
+              />
+            ))}
+          </div>
+        )}
+
+        <div className="yulo-doc-footnote">
+          Content source: <code>admin/src/pages/Doc/docData.js</code> — update this file as the project grows.
+        </div>
       </div>
-    </div>
+    </PagePasswordGate>
   );
 }

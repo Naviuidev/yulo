@@ -17,6 +17,14 @@ const featuredCollectionService = {
     const res = await api.delete(`/admin/featured-collections/${id}`);
     return extractData(res);
   },
+  uploadImage: async (file) => {
+    const form = new FormData();
+    form.append('image', file);
+    const res = await api.post('/admin/featured-collections/upload-image', form, {
+      headers: { 'Content-Type': undefined },
+    });
+    return extractData(res);
+  },
 };
 
 export default featuredCollectionService;

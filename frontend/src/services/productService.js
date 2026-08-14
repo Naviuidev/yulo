@@ -35,7 +35,8 @@ export const productService = {
     }
   },
 
-  searchProducts: (q) => api.get(`/products/search?q=${encodeURIComponent(q)}`),
+  searchProducts: (q, params = {}) =>
+    api.get(`/products/search${buildQueryString({ q, per_page: 8, ...params })}`),
 
   getProduct: async (slug) => {
     try {

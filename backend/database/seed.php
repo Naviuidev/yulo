@@ -29,7 +29,7 @@ if (file_exists($envFile)) {
 require_once $basePath . '/config/Database.php';
 
 $pdo = Database::getInstance();
-$hash = password_hash('Admin@123', PASSWORD_BCRYPT, ['cost' => 12]);
+$hash = password_hash('Hosur@1998', PASSWORD_BCRYPT, ['cost' => 12]);
 
 $stmt = $pdo->prepare(
     'INSERT INTO users (name, email, password, role, status, email_verified_at, created_at, updated_at)
@@ -38,7 +38,7 @@ $stmt = $pdo->prepare(
 );
 $stmt->execute([
     'name' => 'YULO Admin',
-    'email' => 'admin@yulo.com',
+    'email' => '992201351702',
     'password' => $hash,
     'role' => 'admin',
     'status' => 'active',
@@ -46,4 +46,4 @@ $stmt->execute([
     'role_update' => 'admin',
 ]);
 
-echo "Admin user seeded: admin@yulo.com / Admin@123\n";
+echo "Admin user seeded: 992201351702 / Hosur@1998\n";

@@ -30,10 +30,13 @@ final class CartController extends BaseController
             $item['unit_price'] = $payable;
             // Payable unit amount for storefront (must be sale price when set).
             $item['price'] = $payable;
+            $item['gst_applicable'] = Pricing::isGstApplicable($item) ? 1 : 0;
             $item['line_total'] = $payable * (int) $item['quantity'];
             $subtotal += $item['line_total'];
         }
         unset($item);
+
+        $tax = Pricing::gstTaxFromItems($items, 0.0);
 
         Response::jsonSuccess([
             'cart_id' => $cartId,
@@ -41,6 +44,7 @@ final class CartController extends BaseController
             'summary' => [
                 'item_count' => count($items),
                 'subtotal' => round($subtotal, 2),
+                'tax' => $tax,
             ],
         ]);
     }
@@ -66,6 +70,8 @@ final class CartController extends BaseController
         }
 
         $variantId = !empty($input['variant_id']) ? (int) $input['variant_id'] : null;
+        $color = $this->normalizeOption($input['color'] ?? null, 100);
+        $size = $this->normalizeOption($input['size'] ?? null, 20);
         $price = Pricing::effective(
             isset($product['sale_price']) ? (float) $product['sale_price'] : null,
             (float) $product['price']
@@ -84,20 +90,39 @@ final class CartController extends BaseController
             );
         }
 
+        SchemaGuard::ensureCartOrderItemOptions($this->db);
+
         $checkStmt = $this->db->prepare(
-            'SELECT id, quantity FROM cart_items WHERE cart_id = :cart_id AND product_id = :product_id AND (variant_id <=> :variant_id) LIMIT 1'
+            'SELECT id, quantity FROM cart_items
+             WHERE cart_id = :cart_id AND product_id = :product_id AND (variant_id <=> :variant_id)
+               AND COALESCE(color, \'\') = :color AND COALESCE(size, \'\') = :size
+             LIMIT 1'
         );
-        $checkStmt->execute(['cart_id' => $cartId, 'product_id' => $input['product_id'], 'variant_id' => $variantId]);
+        $checkStmt->execute([
+            'cart_id' => $cartId,
+            'product_id' => $input['product_id'],
+            'variant_id' => $variantId,
+            'color' => $color ?? '',
+            'size' => $size ?? '',
+        ]);
         $existing = $checkStmt->fetch();
 
         if ($existing) {
             $newQty = (int) $existing['quantity'] + (int) $input['quantity'];
-            $stmt = $this->db->prepare('UPDATE cart_items SET quantity = :quantity, price = :price, updated_at = NOW() WHERE id = :id');
-            $stmt->execute(['quantity' => $newQty, 'price' => $price, 'id' => $existing['id']]);
+            $stmt = $this->db->prepare(
+                'UPDATE cart_items SET quantity = :quantity, price = :price, color = :color, size = :size, updated_at = NOW() WHERE id = :id'
+            );
+            $stmt->execute([
+                'quantity' => $newQty,
+                'price' => $price,
+                'color' => $color,
+                'size' => $size,
+                'id' => $existing['id'],
+            ]);
         } else {
             $stmt = $this->db->prepare(
-                'INSERT INTO cart_items (cart_id, product_id, variant_id, quantity, price, created_at, updated_at)
-                 VALUES (:cart_id, :product_id, :variant_id, :quantity, :price, NOW(), NOW())'
+                'INSERT INTO cart_items (cart_id, product_id, variant_id, quantity, price, color, size, created_at, updated_at)
+                 VALUES (:cart_id, :product_id, :variant_id, :quantity, :price, :color, :size, NOW(), NOW())'
             );
             $stmt->execute([
                 'cart_id' => $cartId,
@@ -105,10 +130,24 @@ final class CartController extends BaseController
                 'variant_id' => $variantId,
                 'quantity' => $input['quantity'],
                 'price' => $price,
+                'color' => $color,
+                'size' => $size,
             ]);
         }
 
         $this->index();
+    }
+
+    private function normalizeOption(mixed $value, int $maxLen): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $trimmed = trim((string) $value);
+        if ($trimmed === '') {
+            return null;
+        }
+        return mb_substr($trimmed, 0, $maxLen);
     }
 
     public function update(array $params): void

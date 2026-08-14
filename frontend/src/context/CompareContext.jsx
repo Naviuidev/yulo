@@ -31,7 +31,7 @@ export function CompareProvider({ children }) {
   }, [loadCompare]);
 
   const isInCompare = (productId) =>
-    items.some((i) => (i.product_id ?? i.id) === productId);
+    items.some((i) => Number(i.product_id ?? i.id) === Number(productId));
 
   const addToCompare = async (product) => {
     if (isInCompare(product.id)) {
@@ -47,7 +47,17 @@ export function CompareProvider({ children }) {
         await compareService.addItem(product.id);
         await loadCompare();
       } else {
-        const next = [...items, { id: product.id, product_id: product.id, product }];
+        const next = [
+          ...items,
+          {
+            id: product.id,
+            product_id: product.id,
+            product: {
+              ...product,
+              primary_image: product.primary_image ?? product.image,
+            },
+          },
+        ];
         setItems(next);
         setStoredJson(LOCAL_KEY, next);
       }
@@ -57,18 +67,38 @@ export function CompareProvider({ children }) {
     }
   };
 
-  const removeFromCompare = async (id) => {
+  const removeFromCompare = async (productOrCompareId) => {
+    const id = Number(productOrCompareId);
     try {
       if (isAuthenticated) {
-        await compareService.removeItem(id);
+        const row = items.find(
+          (i) => Number(i.compare_id ?? i.id) === id || Number(i.product_id ?? i.id) === id
+        );
+        const apiId = row?.compare_id ?? row?.id ?? id;
+        await compareService.removeItem(apiId);
         await loadCompare();
       } else {
-        const next = items.filter((i) => (i.product_id ?? i.id) !== id);
+        const next = items.filter(
+          (i) => Number(i.product_id ?? i.id) !== id && Number(i.id) !== id
+        );
         setItems(next);
         setStoredJson(LOCAL_KEY, next);
       }
     } catch {
       /* ignore */
+    }
+  };
+
+  const clearCompare = async () => {
+    try {
+      if (isAuthenticated) {
+        await compareService.clearCompare();
+      }
+      setItems([]);
+      setStoredJson(LOCAL_KEY, []);
+      toast.success('Compare list cleared');
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? 'Could not clear compare');
     }
   };
 
@@ -80,6 +110,7 @@ export function CompareProvider({ children }) {
       isInCompare,
       addToCompare,
       removeFromCompare,
+      clearCompare,
       refreshCompare: loadCompare,
     }),
     [items, loadCompare]

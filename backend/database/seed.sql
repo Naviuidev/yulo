@@ -56,12 +56,12 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================================================
 -- USERS
--- Admin: admin@yulo.com / Admin@123
+-- Admin: 992201351702 / Hosur@1998
 -- Customer: customer@yulo.com / Customer@123
 -- ============================================================================
 
 INSERT INTO users (id, name, email, password, phone, role, status, email_verified_at, created_at, updated_at) VALUES
-(1, 'YULO Admin', 'admin@yulo.com', '$2y$12$rOGJRs0AJZx1ZmXAiQdFt.16Sdh8NS8MpSSi95FxXk.zeeUc2Y/8G', '+919876543210', 'admin', 'active', NOW(), NOW(), NOW()),
+(1, 'YULO Admin', '992201351702', '$2y$12$MlhRPNX7eQ.NZiFE55/cYOU9E2BS5ChDeOromwdP5BQu/HLlyU2mm', '+919876543210', 'admin', 'active', NOW(), NOW(), NOW()),
 (2, 'Demo Customer', 'customer@yulo.com', '$2y$12$aqKncUUzKmYQFC.nZ8Wyteq/aIpKXTD4gcgdI7NH5S4Z84yu9hhTO', '+919876543211', 'customer', 'active', NOW(), NOW(), NOW()),
 (3, 'Priya Sharma', 'priya@example.com', '$2y$12$aqKncUUzKmYQFC.nZ8Wyteq/aIpKXTD4gcgdI7NH5S4Z84yu9hhTO', '+919876543213', 'customer', 'active', NOW(), NOW(), NOW());
 

@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import YuloLogo from '../common/YuloLogo';
 import NewsletterForm from '../forms/NewsletterForm';
 import { BRAND_TAGLINE } from '../../utils/constants';
+import api from '../../services/api';
 
 const FOOTER_LINKS = {
   Shop: [
@@ -14,7 +16,7 @@ const FOOTER_LINKS = {
     { to: '/track-order', label: 'Track Order' },
     { to: '/contact', label: 'Contact Us' },
     { to: '/about', label: 'About YULO' },
-    { to: '/blog', label: 'Journal' },
+    { to: '/privacy-policy', label: 'Privacy Policy' },
   ],
   Account: [
     { to: '/login', label: 'Sign In' },
@@ -25,6 +27,21 @@ const FOOTER_LINKS = {
 };
 
 export default function Footer() {
+  const [socials, setSocials] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get('/footer-socials');
+        if (!cancelled) setSocials(Array.isArray(data?.data?.items) ? data.data.items : []);
+      } catch {
+        if (!cancelled) setSocials([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <footer className="yulo-footer">
       <div className="container">
@@ -32,11 +49,21 @@ export default function Footer() {
           <div className="col-lg-4">
             <YuloLogo variant="light" className="yulo-footer__logo" />
             <p className="small opacity-75 mb-3">{BRAND_TAGLINE}</p>
-            <div className="d-flex gap-3">
-              <a href="https://instagram.com" target="_blank" rel="noreferrer"><i className="bi bi-instagram fs-5" /></a>
-              <a href="https://facebook.com" target="_blank" rel="noreferrer"><i className="bi bi-facebook fs-5" /></a>
-              <a href="https://twitter.com" target="_blank" rel="noreferrer"><i className="bi bi-twitter-x fs-5" /></a>
-            </div>
+            {socials.length ? (
+              <div className="d-flex gap-3 flex-wrap">
+                {socials.map((s) => (
+                  <a
+                    key={s.id || s.platform}
+                    href={s.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`YULO on ${s.label || s.platform}`}
+                  >
+                    <i className={`bi ${s.icon || 'bi-link-45deg'} fs-5`} />
+                  </a>
+                ))}
+              </div>
+            ) : null}
           </div>
           {Object.entries(FOOTER_LINKS).map(([title, links]) => (
             <div key={title} className="col-6 col-lg-2">
@@ -57,6 +84,7 @@ export default function Footer() {
         </div>
         <div className="yulo-footer__bottom">
           <span>© {new Date().getFullYear()} YULO. All rights reserved.</span>
+          <Link to="/privacy-policy">Privacy Policy</Link>
         </div>
       </div>
     </footer>

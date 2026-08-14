@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     phone VARCHAR(20) NULL,
-    role ENUM('customer', 'admin', 'super_admin') DEFAULT 'customer',
+    role ENUM('customer', 'admin', 'super_admin', 'staff') DEFAULT 'customer',
+    permissions JSON NULL,
     status ENUM('active', 'inactive', 'banned') DEFAULT 'active',
     email_verified_at DATETIME NULL,
     reset_token VARCHAR(255) NULL,
@@ -84,6 +85,13 @@ CREATE TABLE IF NOT EXISTS products (
     sku VARCHAR(100) NULL,
     price DECIMAL(12, 2) NOT NULL DEFAULT 0,
     sale_price DECIMAL(12, 2) NULL,
+    gst_applicable TINYINT(1) NOT NULL DEFAULT 1,
+    custom_shipping TINYINT(1) NOT NULL DEFAULT 0,
+    shipping_price DECIMAL(12, 2) NULL,
+    has_color_variants TINYINT(1) NOT NULL DEFAULT 0,
+    colors JSON NULL,
+    size_option VARCHAR(10) NOT NULL DEFAULT 'none',
+    sizes JSON NULL,
     stock INT DEFAULT 0,
     category_id INT UNSIGNED NULL,
     brand_id INT UNSIGNED NULL,
@@ -178,6 +186,8 @@ CREATE TABLE IF NOT EXISTS cart_items (
     variant_id INT UNSIGNED NULL,
     quantity INT NOT NULL DEFAULT 1,
     price DECIMAL(12, 2) NOT NULL,
+    color VARCHAR(100) NULL,
+    size VARCHAR(20) NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     FOREIGN KEY (cart_id) REFERENCES carts(id) ON DELETE CASCADE,
@@ -277,6 +287,8 @@ CREATE TABLE IF NOT EXISTS order_items (
     quantity INT NOT NULL,
     price DECIMAL(12, 2) NOT NULL,
     total DECIMAL(12, 2) NOT NULL,
+    color VARCHAR(100) NULL,
+    size VARCHAR(20) NULL,
     created_at DATETIME NOT NULL,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(id)
@@ -540,6 +552,26 @@ CREATE TABLE IF NOT EXISTS tracking_followups (
     INDEX idx_followups_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Storefront visitor page views (admin Visitors analytics)
+CREATE TABLE IF NOT EXISTS visitor_page_views (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    visitor_id CHAR(36) NOT NULL,
+    session_id CHAR(36) NOT NULL,
+    user_id INT UNSIGNED NULL,
+    path VARCHAR(500) NOT NULL,
+    title VARCHAR(255) NULL,
+    referrer VARCHAR(500) NULL,
+    device_type VARCHAR(20) NOT NULL DEFAULT 'desktop',
+    user_agent VARCHAR(500) NULL,
+    ip_hash CHAR(64) NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_vpv_created (created_at),
+    INDEX idx_vpv_visitor (visitor_id),
+    INDEX idx_vpv_session (session_id),
+    INDEX idx_vpv_path (path(191)),
+    INDEX idx_vpv_device (device_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Rate limits
 CREATE TABLE IF NOT EXISTS rate_limits (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -562,12 +594,46 @@ CREATE TABLE IF NOT EXISTS inventory_logs (
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- Default admin user: admin@yulo.com / Admin@123
+-- Staff licences (role-based admin access invites)
+CREATE TABLE IF NOT EXISTS admin_staff_licences (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    staff_email VARCHAR(255) NOT NULL,
+    staff_name VARCHAR(255) NULL,
+    features JSON NOT NULL,
+    status ENUM(
+        'awaiting_dev_otp',
+        'features_pending',
+        'invite_sent',
+        'pending_approval',
+        'approved',
+        'rejected',
+        'cancelled'
+    ) NOT NULL DEFAULT 'awaiting_dev_otp',
+    developer_otp_hash VARCHAR(255) NULL,
+    developer_otp_expires DATETIME NULL,
+    member_otp_hash VARCHAR(255) NULL,
+    member_otp_expires DATETIME NULL,
+    member_otp_verified_at DATETIME NULL,
+    temp_password_hash VARCHAR(255) NULL,
+    invite_token VARCHAR(64) NOT NULL,
+    user_id INT UNSIGNED NULL,
+    created_by INT UNSIGNED NULL,
+    reviewed_by INT UNSIGNED NULL,
+    reviewed_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    UNIQUE KEY uq_invite_token (invite_token),
+    INDEX idx_staff_email (staff_email),
+    INDEX idx_status (status),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- Default admin user: 992201351702 / Hosur@1998
 INSERT INTO users (name, email, password, role, status, email_verified_at, created_at, updated_at)
 VALUES (
     'YULO Admin',
-    'admin@yulo.com',
-    '$2y$12$rOGJRs0AJZx1ZmXAiQdFt.16Sdh8NS8MpSSi95FxXk.zeeUc2Y/8G',
+    '992201351702',
+    '$2y$12$MlhRPNX7eQ.NZiFE55/cYOU9E2BS5ChDeOromwdP5BQu/HLlyU2mm',
     'admin',
     'active',
     NOW(),

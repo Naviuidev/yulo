@@ -11,7 +11,6 @@ const NAV_LINKS = [
   { to: '/shop', label: 'Shop' },
   { to: '/shop?sort=newest', label: 'New In' },
   { to: '/about', label: 'About' },
-  { to: '/blog', label: 'Journal' },
   { to: '/contact', label: 'Contact' },
 ];
 

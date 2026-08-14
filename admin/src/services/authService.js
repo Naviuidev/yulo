@@ -1,4 +1,5 @@
 import api, { extractData } from './api';
+import { ADMIN_ROLES } from '../utils/constants';
 
 const authService = {
   login: async (email, password) => {
@@ -6,7 +7,7 @@ const authService = {
     const data = extractData(res);
     const { user, tokens } = data;
 
-    if (user?.role !== 'admin') {
+    if (!ADMIN_ROLES.includes(user?.role)) {
       throw new Error('Access denied. Admin credentials required.');
     }
 

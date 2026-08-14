@@ -19,6 +19,12 @@ $router->post('/auth/refresh', [AuthController::class, 'refresh']);
 $router->post('/auth/logout', [AuthController::class, 'logout'], [AuthMiddleware::class]);
 $router->get('/auth/me', [AuthController::class, 'me'], [AuthMiddleware::class]);
 
+// Staff onboarding (public invite flow)
+$router->get('/staff-onboard/{token}', [StaffOnboardController::class, 'show']);
+$router->post('/staff-onboard/{token}/send-otp', [StaffOnboardController::class, 'sendOtp']);
+$router->post('/staff-onboard/{token}/verify-otp', [StaffOnboardController::class, 'verifyOtp']);
+$router->post('/staff-onboard/{token}/complete', [StaffOnboardController::class, 'complete']);
+
 // Products (public)
 $router->get('/products', [ProductController::class, 'index']);
 $router->get('/products/filters', [ProductController::class, 'filters']);
@@ -35,6 +41,7 @@ $router->get('/brands/{slug}', [BrandController::class, 'show']);
 
 // Reviews (public read)
 $router->get('/products/{product_id}/reviews', [ReviewController::class, 'index']);
+$router->get('/reviews/testimonials', [ReviewController::class, 'testimonials']);
 
 // Coupons validate (public)
 $router->post('/coupons/validate', [CouponController::class, 'validate']);
@@ -48,6 +55,12 @@ $router->post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'
 $router->post('/newsletter/unsubscribe', [NewsletterController::class, 'unsubscribe']);
 $router->get('/cms/{slug}', [CmsController::class, 'show']);
 $router->get('/settings', [SettingsController::class, 'publicSettings']);
+$router->get('/whatsapp', [WhatsAppController::class, 'show']);
+$router->get('/footer-socials', [FooterSocialController::class, 'index']);
+$router->get('/instagram-feed', [InstagramFeedController::class, 'show']);
+
+// Storefront visitor tracking (public)
+$router->post('/analytics/visit', [VisitController::class, 'track']);
 $router->get('/banners', [BannerController::class, 'index']);
 $router->get('/featured-collections', [FeaturedCollectionController::class, 'index']);
 $router->get('/home-sections', [HomeSectionController::class, 'index']);
@@ -92,6 +105,7 @@ $router->post('/followups/tracking', [FollowupController::class, 'store'], $auth
 $router->get('/followups/tracking/order/{order_id}', [FollowupController::class, 'forOrder'], $auth);
 
 $router->post('/reviews', [ReviewController::class, 'store'], $auth);
+$router->get('/reviews/purchased-products', [ReviewController::class, 'purchasedProducts'], $auth);
 $router->post('/payments/phonepe/initiate', [PaymentController::class, 'initiatePhonePe'], $auth);
 $router->post('/payments/cashfree/initiate', [PaymentController::class, 'initiateCashfree'], $auth);
 $router->post('/payments/cashfree/verify', [PaymentController::class, 'verifyCashfree'], $auth);
@@ -138,6 +152,7 @@ $router->group('/admin', function (Router $router) use ($admin) {
 
     $router->get('/brands', [BrandAdminController::class, 'index'], $admin);
     $router->post('/brands', [BrandAdminController::class, 'store'], $admin);
+    $router->post('/brands/upload-logo', [BrandAdminController::class, 'uploadLogo'], $admin);
     $router->put('/brands/{id}', [BrandAdminController::class, 'update'], $admin);
     $router->delete('/brands/{id}', [BrandAdminController::class, 'destroy'], $admin);
 
@@ -159,6 +174,7 @@ $router->group('/admin', function (Router $router) use ($admin) {
 
     // Inventory
     $router->get('/inventory', [InventoryAdminController::class, 'index'], $admin);
+    $router->get('/inventory/{id}', [InventoryAdminController::class, 'show'], $admin);
     $router->post('/inventory/adjust', [InventoryAdminController::class, 'adjust'], $admin);
     $router->get('/inventory/logs', [InventoryAdminController::class, 'logs'], $admin);
 
@@ -177,15 +193,34 @@ $router->group('/admin', function (Router $router) use ($admin) {
     $router->get('/followups', [FollowupAdminController::class, 'index'], $admin);
     $router->get('/followups/{id}', [FollowupAdminController::class, 'show'], $admin);
     $router->post('/followups/{id}/share-response', [FollowupAdminController::class, 'shareResponse'], $admin);
+    $router->delete('/followups/{id}', [FollowupAdminController::class, 'destroy'], $admin);
+
+    $router->get('/contact-messages', [ContactAdminController::class, 'index'], $admin);
+    $router->patch('/contact-messages/{id}/status', [ContactAdminController::class, 'updateStatus'], $admin);
+    $router->delete('/contact-messages/{id}', [ContactAdminController::class, 'destroy'], $admin);
+
+    // Admin activity notifications
+    $router->get('/notifications', [NotificationAdminController::class, 'index'], $admin);
+    $router->get('/notifications/unread-count', [NotificationAdminController::class, 'unreadCount'], $admin);
+    $router->post('/notifications/read-all', [NotificationAdminController::class, 'markAllRead'], $admin);
+    $router->post('/notifications/mark-read', [NotificationAdminController::class, 'markRead'], $admin);
 
     // Banners & Settings
     $router->get('/banners', [BannerAdminController::class, 'index'], $admin);
     $router->post('/banners', [BannerAdminController::class, 'store'], $admin);
+    $router->post('/banners/upload-image', [BannerAdminController::class, 'uploadImage'], $admin);
     $router->put('/banners/{id}', [BannerAdminController::class, 'update'], $admin);
     $router->delete('/banners/{id}', [BannerAdminController::class, 'destroy'], $admin);
 
+    $router->get('/favicon', [FaviconAdminController::class, 'show'], $admin);
+    $router->put('/favicon', [FaviconAdminController::class, 'update'], $admin);
+    $router->post('/favicon/publish', [FaviconAdminController::class, 'publish'], $admin);
+    $router->delete('/favicon', [FaviconAdminController::class, 'destroy'], $admin);
+    $router->post('/favicon/upload-image', [FaviconAdminController::class, 'uploadImage'], $admin);
+
     $router->get('/featured-collections', [FeaturedCollectionAdminController::class, 'index'], $admin);
     $router->post('/featured-collections', [FeaturedCollectionAdminController::class, 'store'], $admin);
+    $router->post('/featured-collections/upload-image', [FeaturedCollectionAdminController::class, 'uploadImage'], $admin);
     $router->put('/featured-collections/{id}', [FeaturedCollectionAdminController::class, 'update'], $admin);
     $router->delete('/featured-collections/{id}', [FeaturedCollectionAdminController::class, 'destroy'], $admin);
 
@@ -211,6 +246,13 @@ $router->group('/admin', function (Router $router) use ($admin) {
 
     $router->get('/payments/cashfree', [PaymentAdminController::class, 'showCashfree'], $admin);
     $router->put('/payments/cashfree', [PaymentAdminController::class, 'updateCashfree'], $admin);
+    $router->get('/whatsapp', [WhatsAppAdminController::class, 'show'], $admin);
+    $router->put('/whatsapp', [WhatsAppAdminController::class, 'update'], $admin);
+    $router->get('/footer-socials', [FooterSocialAdminController::class, 'show'], $admin);
+    $router->put('/footer-socials', [FooterSocialAdminController::class, 'update'], $admin);
+    $router->get('/instagram-feed', [InstagramFeedAdminController::class, 'show'], $admin);
+    $router->put('/instagram-feed', [InstagramFeedAdminController::class, 'update'], $admin);
+    $router->post('/instagram-feed/sync', [InstagramFeedAdminController::class, 'sync'], $admin);
     $router->get('/shiprocket', [ShiprocketAdminController::class, 'show'], $admin);
     $router->put('/shiprocket', [ShiprocketAdminController::class, 'update'], $admin);
     $router->post('/shiprocket/test', [ShiprocketAdminController::class, 'testConnection'], $admin);
@@ -225,4 +267,17 @@ $router->group('/admin', function (Router $router) use ($admin) {
     $router->post('/faqs', [FaqAdminController::class, 'store'], $admin);
     $router->put('/faqs/{id}', [FaqAdminController::class, 'update'], $admin);
     $router->delete('/faqs/{id}', [FaqAdminController::class, 'destroy'], $admin);
+
+    $router->get('/reviews', [ReviewAdminController::class, 'index'], $admin);
+    $router->patch('/reviews/{id}/status', [ReviewAdminController::class, 'updateStatus'], $admin);
+
+    // Staff licences (master admin only — enforced in controller)
+    $router->get('/staff-licences/features', [StaffLicenceAdminController::class, 'features'], $admin);
+    $router->get('/staff-licences/pending', [StaffLicenceAdminController::class, 'pending'], $admin);
+    $router->get('/staff-licences', [StaffLicenceAdminController::class, 'index'], $admin);
+    $router->post('/staff-licences/start', [StaffLicenceAdminController::class, 'start'], $admin);
+    $router->post('/staff-licences/{id}/verify-dev-otp', [StaffLicenceAdminController::class, 'verifyDevOtp'], $admin);
+    $router->post('/staff-licences/{id}/features', [StaffLicenceAdminController::class, 'assignFeatures'], $admin);
+    $router->post('/staff-licences/{id}/approve', [StaffLicenceAdminController::class, 'approve'], $admin);
+    $router->post('/staff-licences/{id}/reject', [StaffLicenceAdminController::class, 'reject'], $admin);
 });

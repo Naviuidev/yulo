@@ -90,8 +90,10 @@ body {
 }
 
 .yulo-sidebar__logo {
-  width: 96px;
-  height: 28px;
+  width: 110px;
+  height: 32px;
+  object-fit: contain;
+  object-position: left center;
   background: transparent;
   flex-shrink: 0;
 }
@@ -376,6 +378,23 @@ body {
   font-weight: 500;
   font-size: 0.75rem;
   padding: 5px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+}
+
+.yulo-badge--dark,
+.badge.yulo-badge--dark {
+  background-color: #111111 !important;
+  color: #ffffff !important;
+  border-color: #111111;
+}
+
+.yulo-badge--light,
+.badge.yulo-badge--light {
+  background-color: #ffffff !important;
+  color: #111111 !important;
+  border-color: #111111;
 }
 
 /* Charts */
@@ -384,7 +403,69 @@ body {
   position: relative;
 }
 
-/* Login — dark theme */
+.yulo-wave-chart {
+  height: 320px;
+}
+
+/* Login — split layout (60% image / 40% form) */
+.yulo-login-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 60% 40%;
+  background: #0a0a0a;
+}
+
+.yulo-login-page__visual {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #111;
+}
+
+.yulo-login-page__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.yulo-login-page__panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 2rem;
+  background: #0a0a0a;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.yulo-login-page__content {
+  width: 100%;
+  max-width: 380px;
+}
+
+@media (max-width: 991.98px) {
+  .yulo-login-page {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(220px, 36vh) 1fr;
+  }
+
+  .yulo-login-page__visual {
+    min-height: 220px;
+    height: 36vh;
+  }
+
+  .yulo-login-page__panel {
+    min-height: auto;
+    padding: 2rem 1.5rem 2.5rem;
+    align-items: flex-start;
+  }
+}
+
+/* Login / onboard dark card (staff onboard + shared form styles) */
 .yulo-login {
   min-height: 100vh;
   display: flex;
@@ -409,8 +490,9 @@ body {
 }
 
 .yulo-login__logo {
-  width: 140px;
-  height: 40px;
+  width: 160px;
+  height: 44px;
+  object-fit: contain;
   margin: 0 auto 20px;
   display: block;
 }
@@ -458,6 +540,10 @@ body {
   font-family: inherit;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.yulo-login-page__content .yulo-login__field input {
+  background: #111111;
 }
 
 .yulo-login__field input::placeholder {
@@ -514,6 +600,62 @@ body {
   border-width: 0.15em;
 }
 
+.yulo-login__btn--ghost {
+  margin-top: 0;
+  background: transparent;
+  color: #ffffff;
+}
+
+.yulo-login__btn--ghost:hover:not(:disabled) {
+  background: #ffffff;
+  color: #0a0a0a;
+}
+
+.yulo-onboard-msg {
+  color: #ffffff;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.yulo-onboard-msg strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.yulo-onboard-msg--error {
+  color: #ff8a8a;
+}
+
+.yulo-licence-steps--on-dark .yulo-licence-step {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.yulo-licence-steps--on-dark .yulo-licence-step em {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.yulo-licence-steps--on-dark .yulo-licence-step.is-active {
+  color: #ffffff;
+}
+
+.yulo-licence-steps--on-dark .yulo-licence-step.is-active em {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #0a0a0a;
+}
+
+.yulo-licence-steps--on-dark .yulo-licence-step.is-done {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.yulo-licence-steps--on-dark .yulo-licence-step.is-done em {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+
 /* Loader */
 .yulo-loader {
   display: flex;
@@ -532,6 +674,108 @@ body {
   border-radius: var(--yulo-radius);
   border: none;
   box-shadow: var(--yulo-shadow-lg);
+}
+
+/* Social platform picker (Configure Social Connects) */
+.yulo-social-pick {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.yulo-social-pick__btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--yulo-gray-200);
+  border-radius: 8px;
+  background: #fff;
+  color: #111;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.yulo-social-pick__btn i {
+  font-size: 1.35rem;
+  width: 1.5rem;
+  text-align: center;
+}
+
+.yulo-social-pick__btn:hover:not(:disabled) {
+  border-color: #111;
+  background: #f8f8f8;
+}
+
+.yulo-social-pick__btn.is-selected {
+  border-color: #111;
+  background: #111;
+  color: #fff;
+}
+
+.yulo-social-pick__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.yulo-social-pick__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #f3f3f3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Page password gate */
+.yulo-password-gate {
+  min-height: 55vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.yulo-password-gate__card {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+  background: var(--yulo-white);
+  border: 1px solid var(--yulo-gray-200);
+  border-radius: var(--yulo-radius);
+  box-shadow: var(--yulo-shadow);
+  padding: 2rem 1.5rem;
+}
+
+.yulo-password-gate__icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  background: #111;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+}
+
+.yulo-password-gate__title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.yulo-password-gate__text {
+  color: var(--yulo-gray-500, #6c757d);
+  margin-bottom: 1.25rem;
+}
+
+.yulo-password-popup .form-control:focus {
+  border-color: #111;
+  box-shadow: 0 0 0 0.2rem rgba(17, 17, 17, 0.12);
 }
 
 .yulo-dropdown {
@@ -567,6 +811,109 @@ body {
   box-shadow: 0 0 0 3px rgba(var(--yulo-gold-rgb), 0.15);
 }
 
+.yulo-option-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 767.98px) {
+  .yulo-option-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.yulo-option-card {
+  border: 1px solid var(--yulo-gray-200);
+  border-radius: 10px;
+  background: #fafafa;
+  padding: 14px 16px;
+  height: 100%;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.yulo-option-card.is-on {
+  border-color: rgba(var(--yulo-gold-rgb), 0.55);
+  background: rgba(var(--yulo-gold-rgb), 0.06);
+}
+
+.yulo-option-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.yulo-option-card__title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--yulo-black);
+}
+
+.yulo-option-card__hint {
+  font-size: 0.78rem;
+  color: var(--yulo-gray-500, #6c757d);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+.yulo-option-card .form-check-input {
+  width: 2.4em;
+  height: 1.25em;
+  cursor: pointer;
+}
+
+.yulo-color-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--yulo-gray-200);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.yulo-color-slot__picker {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--yulo-gray-200);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.yulo-size-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.yulo-size-chip {
+  min-width: 48px;
+  padding: 8px 12px;
+  border: 1px solid var(--yulo-gray-200);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--yulo-black);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.yulo-size-chip:hover {
+  border-color: rgba(var(--yulo-gold-rgb), 0.55);
+}
+
+.yulo-size-chip.is-active {
+  border-color: var(--yulo-black);
+  background: var(--yulo-black);
+  color: #fff;
+}
+
 /* Alerts list */
 .yulo-alert-item {
   display: flex;
@@ -574,6 +921,15 @@ body {
   gap: 12px;
   padding: 12px 16px;
   border-bottom: 1px solid var(--yulo-gray-100);
+}
+
+.yulo-alert-item--clickable {
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.yulo-alert-item--clickable:hover {
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .yulo-alert-item:last-child {
@@ -674,38 +1030,123 @@ body {
   z-index: 1055;
 }
 
-/* Toastify — black strip, white text */
+/* Toastify — centered; 80px side space; success/error white + icons */
+.Toastify__toast-container.yulo-toast-container,
+.yulo-toast-container.Toastify__toast-container--top-center {
+  top: 50% !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) !important;
+  width: max-content !important;
+  max-width: min(94vw, 640px) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
 .Toastify__toast,
-.Toastify__toast--success,
-.Toastify__toast--error,
+.Toastify__toast--default,
 .Toastify__toast--info,
 .Toastify__toast--warning,
 .yulo-toast {
   font-family: 'Poppins', sans-serif;
+  width: max-content !important;
+  max-width: min(94vw, 640px) !important;
+  min-width: 0 !important;
+  margin-bottom: 0.75rem !important;
+  padding: 14px 80px !important;
   border-radius: 0;
   background: #000 !important;
   color: #fff !important;
-  box-shadow: none;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
   border: 1px solid #000;
+  gap: 10px;
+}
+
+.Toastify__toast--success,
+.Toastify__toast--error {
+  background: #fff !important;
+  color: #111 !important;
+  border: 1px solid #e5e5e5 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16) !important;
 }
 
 .Toastify__toast-body,
 .yulo-toast__body {
-  color: #fff !important;
+  color: inherit !important;
   font-size: 0.875rem;
   font-weight: 500;
+  padding: 0 !important;
+  margin: 0 !important;
+  flex: 0 1 auto !important;
+  width: auto !important;
 }
 
-.Toastify__close-button,
+.Toastify__toast--success .Toastify__toast-body,
+.Toastify__toast--success .yulo-toast__body,
+.Toastify__toast--error .Toastify__toast-body,
+.Toastify__toast--error .yulo-toast__body {
+  color: #111 !important;
+}
+
+.Toastify__close-button {
+  color: #fff !important;
+  opacity: 1 !important;
+  align-self: center !important;
+  margin-left: 10px !important;
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  border-radius: 50% !important;
+  background: #111 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+}
+
 .Toastify__close-button > svg {
   color: #fff !important;
-  opacity: 0.85;
+  fill: #fff !important;
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.Toastify__toast--success .Toastify__close-button,
+.Toastify__toast--error .Toastify__close-button {
+  background: #111 !important;
+}
+
+.Toastify__toast--success .Toastify__close-button > svg,
+.Toastify__toast--error .Toastify__close-button > svg {
+  color: #fff !important;
+  fill: #fff !important;
+}
+
+.Toastify__toast-icon {
+  display: flex !important;
+  width: auto !important;
+  margin: 0 !important;
+  flex-shrink: 0;
+}
+
+.yulo-toast-mark {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.yulo-toast-mark--success {
+  color: #16a34a !important;
+}
+
+.yulo-toast-mark--error {
+  color: #dc2626 !important;
 }
 
 .Toastify__progress-bar,
 .Toastify__progress-bar--success,
 .Toastify__progress-bar--error {
-  background: #fff !important;
+  background: #111 !important;
 }
 
 /* Responsive */
@@ -1197,3 +1638,178 @@ body {
   border-color: var(--yulo-gold);
   box-shadow: 0 0 0 0.2rem rgba(var(--yulo-gold-rgb), 0.15);
 }
+
+/* Reviews admin */
+.yulo-review-admin__list {
+  display: grid;
+  gap: 1rem;
+}
+
+.yulo-review-admin__card {
+  border: 1px solid var(--yulo-gray-200);
+  background: #fff;
+  padding: 1.15rem 1.25rem;
+}
+
+.yulo-review-admin__card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.yulo-review-admin__avatar {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.yulo-review-admin__avatar--placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #111;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.yulo-review-admin__share {
+  max-width: 640px;
+  border: 1px solid var(--yulo-gray-200);
+  background: #fff;
+  padding: 1.25rem;
+}
+
+/* Instagram feed admin */
+.yulo-insta-admin__creds {
+  border: 1px solid var(--yulo-gray-200);
+  background: #fff;
+  padding: 1.15rem 1.25rem;
+}
+
+.yulo-insta-admin__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.85rem;
+}
+
+.yulo-insta-admin__card {
+  border: 1px solid var(--yulo-gray-200);
+  background: #fff;
+  overflow: hidden;
+}
+
+.yulo-insta-admin__card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: #f5f5f5;
+}
+
+.yulo-insta-admin__card-body {
+  padding: 0.65rem 0.75rem 0.85rem;
+}
+
+/* Image URL + upload pill */
+.yulo-image-url-field {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.yulo-image-url-field .form-control {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.yulo-upload-pill {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  border-radius: 999px !important;
+  padding-left: 0.95rem;
+  padding-right: 0.95rem;
+  align-self: center;
+}
+
+/* Staff licence wizard */
+.yulo-licence-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+}
+
+.yulo-licence-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #999;
+}
+
+.yulo-licence-step em {
+  font-style: normal;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  border: 1px solid #ddd;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+}
+
+.yulo-licence-step.is-active {
+  color: #111;
+  font-weight: 600;
+}
+
+.yulo-licence-step.is-active em {
+  background: #111;
+  border-color: #111;
+  color: #fff;
+}
+
+.yulo-licence-step.is-done {
+  color: #555;
+}
+
+.yulo-licence-step.is-done em {
+  background: #eee;
+  border-color: #ccc;
+}
+
+.yulo-licence-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.5rem;
+}
+
+.yulo-licence-feature {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid #e5e5e5;
+  border-radius: 999px;
+  padding: 0.55rem 0.85rem;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  margin: 0;
+  background: #fff;
+}
+
+.yulo-licence-feature.is-on {
+  border-color: #111;
+  background: #f7f7f7;
+}
+
+.yulo-licence-feature input {
+  margin: 0;
+}
+

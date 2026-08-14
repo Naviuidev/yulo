@@ -84,19 +84,32 @@ final class AuthController extends BaseController
     public function login(array $params = []): void
     {
         $input = $this->getJsonInput();
+        $login = trim((string) ($input['user_id'] ?? $input['email'] ?? ''));
+        $password = (string) ($input['password'] ?? '');
 
-        $validator = Validator::make($input)->required('email')->email('email')->required('password');
+        $validator = Validator::make([
+            'login' => $login,
+            'password' => $password,
+        ])->required('login')->required('password');
+
         if ($validator->fails()) {
             Response::jsonError('Validation failed.', 422, $validator->errors());
         }
 
-        $user = $this->userModel->findByEmail(strtolower(trim($input['email'])));
+        $user = $this->userModel->findByEmail(strtolower($login));
 
-        if (!$user || !Security::verifyPassword($input['password'], $user['password'])) {
-            Response::jsonError('Invalid email or password.', 401);
+        if (!$user || !Security::verifyPassword($password, $user['password'])) {
+            Response::jsonError('Invalid user ID or password.', 401);
         }
 
-        if (empty($user['email_verified_at']) || ($user['status'] ?? '') !== 'active') {
+        if (($user['status'] ?? '') !== 'active') {
+            if (($user['role'] ?? '') === 'staff') {
+                Response::jsonError('Your access is pending master admin approval.', 403);
+            }
+            Response::jsonError('Account is inactive.', 403);
+        }
+
+        if (empty($user['email_verified_at'])) {
             $this->createAndSendOtp((int) $user['id'], $user['email'], $user['name'] ?? 'Customer');
             Response::jsonError(
                 'Please verify your email with the OTP we just sent.',
@@ -112,6 +125,10 @@ final class AuthController extends BaseController
         $tokens = $this->issueTokens((int) $user['id'], $user['role']);
 
         unset($user['password']);
+        if (isset($user['permissions']) && is_string($user['permissions'])) {
+            $decoded = json_decode($user['permissions'], true);
+            $user['permissions'] = is_array($decoded) ? $decoded : null;
+        }
 
         Response::jsonSuccess([
             'user' => $user,

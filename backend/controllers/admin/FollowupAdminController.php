@@ -177,4 +177,19 @@ final class FollowupAdminController extends BaseController
             'track_url' => $emailResult['track_url'] ?? null,
         ], 'Tracking shared with customer.');
     }
+
+    public function destroy(array $params): void
+    {
+        SchemaGuard::ensureTrackingFollowups($this->db);
+        $id = (int) ($params['id'] ?? 0);
+
+        $stmt = $this->db->prepare('DELETE FROM tracking_followups WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+
+        if ($stmt->rowCount() === 0) {
+            Response::jsonError('Follow-up not found.', 404);
+        }
+
+        Response::jsonSuccess(null, 'Follow-up deleted.');
+    }
 }

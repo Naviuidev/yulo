@@ -55,7 +55,11 @@ export function CartProvider({ children }) {
         await loadCart();
       } else {
         const existing = items.find(
-          (i) => i.product_id === product.id && i.variant_id === variant_id
+          (i) =>
+            i.product_id === product.id &&
+            i.variant_id === variant_id &&
+            (i.size || '') === (size || '') &&
+            (i.color || '') === (color || '')
         );
         let next;
         if (existing) {
@@ -73,6 +77,9 @@ export function CartProvider({ children }) {
               price: getEffectivePrice(product),
               sale_price: product.sale_price,
               regular_price: product.price,
+              gst_applicable: product.gst_applicable === undefined ? 1 : Number(product.gst_applicable) ? 1 : 0,
+              custom_shipping: Number(product.custom_shipping) ? 1 : 0,
+              shipping_price: product.shipping_price ?? null,
               quantity,
               variant_id,
               size,

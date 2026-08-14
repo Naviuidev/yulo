@@ -8,7 +8,21 @@ import useWishlist from '../../hooks/useWishlist';
 export default function Wishlist() {
   const { items } = useWishlist();
 
-  const products = items.map((i) => i.product ?? i);
+  const products = items.map((i) => {
+    if (i.product) {
+      return {
+        ...i.product,
+        id: i.product.id ?? i.product_id,
+        stock: i.product.stock ?? i.stock,
+      };
+    }
+    return {
+      ...i,
+      id: i.product_id ?? i.id,
+      stock: i.stock,
+      primary_image: i.primary_image ?? i.image,
+    };
+  });
 
   return (
     <>

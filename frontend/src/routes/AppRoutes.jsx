@@ -18,12 +18,14 @@ const Blog = lazy(() => import('../pages/Blog/Blog'));
 const BlogDetail = lazy(() => import('../pages/Blog/BlogDetail'));
 const Contact = lazy(() => import('../pages/Contact/Contact'));
 const About = lazy(() => import('../pages/About/About'));
+const PrivacyPolicy = lazy(() => import('../pages/Privacy/PrivacyPolicy'));
 const Login = lazy(() => import('../pages/Auth/Login'));
 const Register = lazy(() => import('../pages/Auth/Register'));
 const ForgotPassword = lazy(() => import('../pages/Auth/ForgotPassword'));
 const ResetPassword = lazy(() => import('../pages/Auth/ResetPassword'));
 const VerifyEmail = lazy(() => import('../pages/Auth/VerifyEmail'));
 const TrackOrder = lazy(() => import('../pages/TrackOrder/TrackOrder'));
+const WriteReview = lazy(() => import('../pages/Reviews/WriteReview'));
 const CashfreeReturn = lazy(() => import('../pages/Payment/CashfreeReturn'));
 const NotFound = lazy(() => import('../pages/NotFound/NotFound'));
 
@@ -53,7 +55,9 @@ export default function AppRoutes() {
         <Route path="blog/:slug" element={<SuspenseWrap><BlogDetail /></SuspenseWrap>} />
         <Route path="contact" element={<SuspenseWrap><Contact /></SuspenseWrap>} />
         <Route path="about" element={<SuspenseWrap><About /></SuspenseWrap>} />
+        <Route path="privacy-policy" element={<SuspenseWrap><PrivacyPolicy /></SuspenseWrap>} />
         <Route path="track-order" element={<SuspenseWrap><TrackOrder /></SuspenseWrap>} />
+        <Route path="write-review" element={<SuspenseWrap><WriteReview /></SuspenseWrap>} />
         <Route
           path="payment/cashfree/return"
           element={

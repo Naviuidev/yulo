@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-toastify';
-import PageHeader from '../../components/common/PageHeader';
 import DataTable from '../../components/common/DataTable';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import ImageUrlUploadField from '../../components/common/ImageUrlUploadField';
 import bannerService from '../../services/bannerService';
 import featuredCollectionService from '../../services/featuredCollectionService';
+import { resolveMediaUrl } from '../../utils/media';
 
-const TABS = [
-  { id: 'banners', label: 'Banners', icon: 'bi-images' },
+const INNER_TABS = [
+  { id: 'banners', label: 'Hero Banners', icon: 'bi-images' },
   { id: 'featured', label: 'Featured Collection', icon: 'bi-grid-1x2' },
 ];
 
@@ -34,12 +34,12 @@ const emptyFeaturedForm = {
   status: 'active',
 };
 
-function BannersTab() {
+function HeroBannersTab() {
   const [loading, setLoading] = useState(true);
   const [banners, setBanners] = useState([]);
   const [editing, setEditing] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
-  const { register, handleSubmit, reset, watch } = useForm({ defaultValues: emptyBannerForm });
+  const { register, handleSubmit, reset, watch, setValue } = useForm({ defaultValues: emptyBannerForm });
 
   const watchPosition = watch('position');
   const watchStatus = watch('status');
@@ -138,7 +138,7 @@ function BannersTab() {
       render: (r) =>
         r.image ? (
           <img
-            src={r.image}
+            src={resolveMediaUrl(r.image)}
             alt={r.title || 'Banner'}
             style={{ width: 72, height: 40, objectFit: 'cover', borderRadius: 4 }}
           />
@@ -182,24 +182,17 @@ function BannersTab() {
               <input className="form-control" placeholder="Hero 1" {...register('title')} />
             </div>
             <div className="mb-3">
-              <label className="form-label">Image URL *</label>
-              <input
-                className="form-control"
-                placeholder="https://… or /uploads/banners/…"
-                {...register('image', { required: true })}
+              <ImageUrlUploadField
+                label="Image URL"
+                name="image"
+                register={register}
+                setValue={setValue}
+                value={watchImage}
+                required
+                helpText="Use a wide landscape image (≈1920×1080)."
+                preview="image"
+                uploadFn={bannerService.uploadImage}
               />
-              <div className="form-text">Use a wide landscape image (≈1920×1080).</div>
-              {watchImage ? (
-                <img
-                  src={watchImage}
-                  alt="Preview"
-                  className="mt-2 rounded border"
-                  style={{ width: '100%', maxHeight: 140, objectFit: 'cover' }}
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-              ) : null}
             </div>
             <div className="mb-3">
               <label className="form-label">Link URL (optional)</label>
@@ -285,7 +278,7 @@ function FeaturedLayoutPreview({ items }) {
   return (
     <div className="featured-admin-preview">
       <div className="featured-admin-preview__main">
-        {main?.image ? <img src={main.image} alt={main.title} /> : null}
+        {main?.image ? <img src={resolveMediaUrl(main.image)} alt={main.title} /> : null}
         <div className="featured-admin-preview__label">
           <strong>{main?.title || 'Title'}</strong>
           {main?.cta_text ? <span>{main.cta_text}</span> : null}
@@ -296,7 +289,7 @@ function FeaturedLayoutPreview({ items }) {
           const item = side[idx];
           return (
             <div key={idx} className="featured-admin-preview__item">
-              {item?.image ? <img src={item.image} alt={item.title || ''} /> : (
+              {item?.image ? <img src={resolveMediaUrl(item.image)} alt={item.title || ''} /> : (
                 <div className="featured-admin-preview__empty">Side {idx + 1}</div>
               )}
               {item ? (
@@ -317,7 +310,7 @@ function FeaturedCollectionTab() {
   const [items, setItems] = useState([]);
   const [editing, setEditing] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
-  const { register, handleSubmit, reset, watch } = useForm({ defaultValues: emptyFeaturedForm });
+  const { register, handleSubmit, reset, watch, setValue } = useForm({ defaultValues: emptyFeaturedForm });
   const watchImage = watch('image');
   const watchTitle = watch('title');
   const watchStatus = watch('status');
@@ -412,7 +405,7 @@ function FeaturedCollectionTab() {
       label: 'Image',
       render: (r) =>
         r.image ? (
-          <img src={r.image} alt={r.title} style={{ width: 64, height: 48, objectFit: 'cover', borderRadius: 4 }} />
+          <img src={resolveMediaUrl(r.image)} alt={r.title} style={{ width: 64, height: 48, objectFit: 'cover', borderRadius: 4 }} />
         ) : (
           '—'
         ),
@@ -471,18 +464,17 @@ function FeaturedCollectionTab() {
             </div>
 
             <div className="mb-3">
-              <label className="form-label">Image URL *</label>
-              <input
-                className="form-control"
-                placeholder="https://… or /uploads/…"
-                {...register('image', { required: true })}
+              <ImageUrlUploadField
+                label="Image URL"
+                name="image"
+                register={register}
+                setValue={setValue}
+                value={watchImage}
+                required
+                preview="image"
+                overlayLabel={watchTitle}
+                uploadFn={featuredCollectionService.uploadImage}
               />
-              {watchImage ? (
-                <div className="featured-admin-form-thumb mt-2">
-                  <img src={watchImage} alt="" />
-                  <div className="featured-admin-form-thumb__label">{watchTitle || 'Text on image'}</div>
-                </div>
-              ) : null}
             </div>
 
             <div className="mb-3">
@@ -556,26 +548,21 @@ function FeaturedCollectionTab() {
   );
 }
 
-const Banners = () => {
-  const [tab, setTab] = useState('banners');
+/** Banner + Featured Collection panel for Brands page. */
+export default function BannersPanel({ initialInnerTab = 'banners' } = {}) {
+  const [innerTab, setInnerTab] = useState(
+    INNER_TABS.some((t) => t.id === initialInnerTab) ? initialInnerTab : 'banners'
+  );
 
   return (
     <>
-      <Helmet>
-        <title>Banners — YULO Admin</title>
-      </Helmet>
-      <PageHeader
-        title="Banners"
-        subtitle="Hero banners and homepage Featured Collection tiles"
-      />
-
       <div className="yulo-doc-cats mb-4">
-        {TABS.map((t) => (
+        {INNER_TABS.map((t) => (
           <button
             key={t.id}
             type="button"
-            className={`yulo-doc-cat ${tab === t.id ? 'is-active' : ''}`}
-            onClick={() => setTab(t.id)}
+            className={`yulo-doc-cat ${innerTab === t.id ? 'is-active' : ''}`}
+            onClick={() => setInnerTab(t.id)}
           >
             <i className={`bi ${t.icon}`} />
             <span>{t.label}</span>
@@ -583,9 +570,7 @@ const Banners = () => {
         ))}
       </div>
 
-      {tab === 'banners' ? <BannersTab /> : <FeaturedCollectionTab />}
+      {innerTab === 'banners' ? <HeroBannersTab /> : <FeaturedCollectionTab />}
     </>
   );
-};
-
-export default Banners;
+}

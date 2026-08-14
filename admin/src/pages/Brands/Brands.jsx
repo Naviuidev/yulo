@@ -1,23 +1,31 @@
 import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-toastify';
 import PageHeader from '../../components/common/PageHeader';
 import DataTable from '../../components/common/DataTable';
 import ConfirmModal from '../../components/common/ConfirmModal';
+import StatusBadge from '../../components/common/StatusBadge';
 import brandService from '../../services/brandService';
 import homeSectionService from '../../services/homeSectionService';
+import BannersPanel from './BannersPanel';
+import FavIconPanel from './FavIconPanel';
+import ImageUrlUploadField from '../../components/common/ImageUrlUploadField';
 import { slugify } from '../../utils/formatters';
+import { resolveMediaUrl } from '../../utils/media';
 
 const TABS = [
   { id: 'brands', label: 'Brands', icon: 'bi-award' },
   { id: 'sections', label: 'Sections UI', icon: 'bi-layout-text-window-reverse' },
   { id: 'sales', label: 'Configure Sales', icon: 'bi-lightning-charge' },
+  { id: 'banners', label: 'Banners', icon: 'bi-images' },
+  { id: 'favicon', label: 'Fav Icon', icon: 'bi-stars' },
 ];
 
 const FLASH_SLUG = 'flash-sale';
 
-const emptyBrand = { name: '', slug: '', description: '', status: 'active' };
+const emptyBrand = { name: '', slug: '', logo: '', description: '', status: 'active' };
 const emptySection = {
   name: '',
   slug: '',
@@ -42,6 +50,7 @@ function BrandsTab() {
   });
 
   const name = watch('name');
+  const logo = watch('logo');
 
   const fetchBrands = async () => {
     setLoading(true);
@@ -66,6 +75,7 @@ function BrandsTab() {
     reset({
       name: brand.name,
       slug: brand.slug,
+      logo: brand.logo || '',
       description: brand.description || '',
       status: brand.status || 'active',
     });
@@ -73,11 +83,18 @@ function BrandsTab() {
 
   const onSubmit = async (data) => {
     try {
+      const payload = {
+        name: data.name,
+        slug: data.slug,
+        logo: data.logo?.trim() || null,
+        description: data.description || null,
+        status: data.status || 'active',
+      };
       if (editing) {
-        await brandService.update(editing.id, data);
+        await brandService.update(editing.id, payload);
         toast.success('Brand updated');
       } else {
-        await brandService.create(data);
+        await brandService.create(payload);
         toast.success('Brand created');
       }
       reset(emptyBrand);
@@ -100,9 +117,24 @@ function BrandsTab() {
   };
 
   const columns = [
+    {
+      key: 'logo',
+      label: 'Logo',
+      render: (r) => (
+        r.logo ? (
+          <img
+            src={resolveMediaUrl(r.logo)}
+            alt=""
+            style={{ width: 40, height: 28, objectFit: 'contain' }}
+          />
+        ) : (
+          <span className="text-muted">—</span>
+        )
+      ),
+    },
     { key: 'name', label: 'Brand' },
     { key: 'slug', label: 'Slug' },
-    { key: 'status', label: 'Status' },
+    { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     {
       key: 'actions',
       label: '',
@@ -132,6 +164,18 @@ function BrandsTab() {
             <div className="mb-3">
               <label className="form-label">Slug *</label>
               <input className={`form-control ${errors.slug ? 'is-invalid' : ''}`} {...register('slug', { required: true })} />
+            </div>
+            <div className="mb-3">
+              <ImageUrlUploadField
+                label="Logo URL"
+                name="logo"
+                register={register}
+                setValue={setValue}
+                value={logo}
+                helpText="Shown on the storefront Our Brands strip. Leave blank to show the brand name."
+                preview="logo"
+                uploadFn={brandService.uploadLogo}
+              />
             </div>
             <div className="mb-3">
               <label className="form-label">Description</label>
@@ -273,7 +317,7 @@ function SectionsTab() {
             <i className="bi bi-pencil" />
           </button>
           {isFlashLocked(r) ? (
-            <span className="badge text-bg-secondary align-self-center" title="Protected section">
+            <span className="badge yulo-badge yulo-badge--light align-self-center" title="Protected section">
               Locked
             </span>
           ) : (
@@ -581,14 +625,32 @@ function ConfigureSalesTab() {
 }
 
 const Brands = () => {
-  const [tab, setTab] = useState('brands');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const initialTab = TABS.some((t) => t.id === tabFromUrl) ? tabFromUrl : 'brands';
+  const [tab, setTab] = useState(initialTab);
+
+  useEffect(() => {
+    if (TABS.some((t) => t.id === tabFromUrl) && tabFromUrl !== tab) {
+      setTab(tabFromUrl);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabFromUrl]);
+
+  const selectTab = (id) => {
+    setTab(id);
+    setSearchParams(id === 'brands' ? {} : { tab: id }, { replace: true });
+  };
 
   return (
     <>
       <Helmet>
         <title>Brands — YULO Admin</title>
       </Helmet>
-      <PageHeader title="Brands & Sections" subtitle="Product brands, homepage sections, and Flash Sale schedule" />
+      <PageHeader
+        title="Brands & Sections"
+        subtitle="Product brands, homepage sections, Flash Sale schedule, banners, and favicon"
+      />
 
       <div className="yulo-doc-cats mb-4">
         {TABS.map((t) => (
@@ -596,7 +658,7 @@ const Brands = () => {
             key={t.id}
             type="button"
             className={`yulo-doc-cat ${tab === t.id ? 'is-active' : ''}`}
-            onClick={() => setTab(t.id)}
+            onClick={() => selectTab(t.id)}
           >
             <i className={`bi ${t.icon}`} />
             <span>{t.label}</span>
@@ -607,6 +669,8 @@ const Brands = () => {
       {tab === 'brands' && <BrandsTab />}
       {tab === 'sections' && <SectionsTab />}
       {tab === 'sales' && <ConfigureSalesTab />}
+      {tab === 'banners' && <BannersPanel />}
+      {tab === 'favicon' && <FavIconPanel />}
     </>
   );
 };

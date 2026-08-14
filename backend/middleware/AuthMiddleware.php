@@ -21,13 +21,21 @@ final class AuthMiddleware
         }
 
         $pdo = Database::getInstance();
-        $stmt = $pdo->prepare('SELECT id, name, email, phone, role, status, email_verified_at FROM users WHERE id = :id AND status = :status LIMIT 1');
+        $stmt = $pdo->prepare(
+            'SELECT id, name, email, phone, role, permissions, status, email_verified_at
+             FROM users WHERE id = :id AND status = :status LIMIT 1'
+        );
         $stmt->execute(['id' => $payload['sub'], 'status' => 'active']);
         $user = $stmt->fetch();
 
         if (!$user) {
             Response::jsonError('User not found or inactive.', 401);
             return false;
+        }
+
+        if (isset($user['permissions']) && is_string($user['permissions'])) {
+            $decoded = json_decode($user['permissions'], true);
+            $user['permissions'] = is_array($decoded) ? $decoded : null;
         }
 
         $GLOBALS['auth_user'] = $user;

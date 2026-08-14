@@ -1,8 +1,30 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getInitials } from '../../utils/formatters';
+import notificationService from '../../services/notificationService';
 
 const Topbar = ({ onMenuToggle, title }) => {
   const { user, logout } = useAuth();
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const data = await notificationService.unreadCount();
+        if (!cancelled) setUnread(Number(data?.unread_count || 0));
+      } catch {
+        if (!cancelled) setUnread(0);
+      }
+    };
+    load();
+    const timer = setInterval(load, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
 
   return (
     <header className="yulo-topbar">
@@ -19,10 +41,10 @@ const Topbar = ({ onMenuToggle, title }) => {
           <input type="search" placeholder="Search..." className="form-control form-control-sm" />
         </div>
 
-        <button type="button" className="btn btn-link position-relative text-dark">
+        <Link to="/notifications" className="btn btn-link position-relative text-dark" title="Notifications">
           <i className="bi bi-bell fs-5" />
-          <span className="yulo-notification-dot" />
-        </button>
+          {unread > 0 ? <span className="yulo-notification-dot" /> : null}
+        </Link>
 
         <div className="dropdown">
           <button

@@ -25,11 +25,15 @@ final class Cart
 
     public function getItems(int $cartId): array
     {
+        SchemaGuard::ensureProductCommerceOptions($this->db);
+        SchemaGuard::ensureCartOrderItemOptions($this->db);
+
         // Alias columns so p.price does not overwrite cart_items.price (ci.*).
         $stmt = $this->db->prepare(
             'SELECT ci.id, ci.cart_id, ci.product_id, ci.variant_id, ci.quantity,
-                    ci.price AS cart_price, ci.created_at, ci.updated_at,
-                    p.name, p.slug, p.price, p.sale_price, p.stock,
+                    ci.price AS cart_price, ci.color, ci.size, ci.created_at, ci.updated_at,
+                    p.name, p.slug, p.price, p.sale_price, p.stock, p.gst_applicable,
+                    p.custom_shipping, p.shipping_price, p.has_color_variants, p.colors, p.size_option, p.sizes,
                     pv.name AS variant_name, pv.price AS variant_price, pv.sale_price AS variant_sale_price,
                     (SELECT image_path FROM product_images WHERE product_id = p.id AND is_primary = 1 LIMIT 1) AS image
              FROM cart_items ci

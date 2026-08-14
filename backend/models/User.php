@@ -10,10 +10,20 @@ final class User
 
     public function findById(int $id): ?array
     {
-        $stmt = $this->db->prepare('SELECT id, name, email, phone, role, status, email_verified_at, created_at FROM users WHERE id = :id LIMIT 1');
+        $stmt = $this->db->prepare(
+            'SELECT id, name, email, phone, role, permissions, status, email_verified_at, created_at
+             FROM users WHERE id = :id LIMIT 1'
+        );
         $stmt->execute(['id' => $id]);
         $user = $stmt->fetch();
-        return $user ?: null;
+        if (!$user) {
+            return null;
+        }
+        if (isset($user['permissions']) && is_string($user['permissions'])) {
+            $decoded = json_decode($user['permissions'], true);
+            $user['permissions'] = is_array($decoded) ? $decoded : null;
+        }
+        return $user;
     }
 
     public function findByEmail(string $email): ?array

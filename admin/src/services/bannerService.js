@@ -17,6 +17,14 @@ const bannerService = {
     const res = await api.delete(`/admin/banners/${id}`);
     return extractData(res);
   },
+  uploadImage: async (file) => {
+    const form = new FormData();
+    form.append('image', file);
+    const res = await api.post('/admin/banners/upload-image', form, {
+      headers: { 'Content-Type': undefined },
+    });
+    return extractData(res);
+  },
 };
 
 export default bannerService;

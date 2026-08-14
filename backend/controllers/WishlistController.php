@@ -11,16 +11,23 @@ final class WishlistController extends BaseController
         $userId = $this->authUserId();
 
         $stmt = $this->db->prepare(
-            'SELECT w.id, w.product_id, w.created_at, p.name, p.slug, p.price, p.sale_price,
-                    (SELECT image_path FROM product_images WHERE product_id = p.id AND is_primary = 1 LIMIT 1) as image
+            'SELECT w.id AS wishlist_id, w.product_id, w.created_at,
+                    p.id, p.name, p.slug, p.price, p.sale_price, p.stock,
+                    p.is_new, p.is_featured,
+                    c.name AS category_name, b.name AS brand_name,
+                    ' . Review::productSelectSql('p') . ',
+                    (SELECT image_path FROM product_images WHERE product_id = p.id AND is_primary = 1 LIMIT 1) AS primary_image,
+                    (SELECT image_path FROM product_images WHERE product_id = p.id AND is_primary = 1 LIMIT 1) AS image
              FROM wishlists w
              JOIN products p ON p.id = w.product_id
+             LEFT JOIN categories c ON c.id = p.category_id
+             LEFT JOIN brands b ON b.id = p.brand_id
              WHERE w.user_id = :user_id AND p.status = :status
              ORDER BY w.created_at DESC'
         );
         $stmt->execute(['user_id' => $userId, 'status' => 'active']);
 
-        Response::jsonSuccess($stmt->fetchAll());
+        Response::jsonSuccess(Review::enrichProducts($stmt->fetchAll()));
     }
 
     public function add(array $params = []): void

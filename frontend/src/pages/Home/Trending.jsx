@@ -48,6 +48,7 @@ export default function Trending() {
           </Link>
         </div>
         <Swiper
+          className="product-slider"
           modules={[Navigation, Autoplay]}
           navigation
           spaceBetween={24}

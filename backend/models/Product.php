@@ -10,6 +10,7 @@ final class Product
 
     public function findById(int $id): ?array
     {
+        SchemaGuard::ensureProductCommerceOptions($this->db);
         $stmt = $this->db->prepare(
             'SELECT p.*, c.name as category_name, c.slug as category_slug, b.name as brand_name, b.slug as brand_slug
              FROM products p
@@ -18,11 +19,12 @@ final class Product
              WHERE p.id = :id LIMIT 1'
         );
         $stmt->execute(['id' => $id]);
-        return $stmt->fetch() ?: null;
+        return $this->normalizeProductRow($stmt->fetch() ?: null);
     }
 
     public function findBySlug(string $slug): ?array
     {
+        SchemaGuard::ensureProductCommerceOptions($this->db);
         $stmt = $this->db->prepare(
             'SELECT p.*, c.name as category_name, c.slug as category_slug, b.name as brand_name, b.slug as brand_slug
              FROM products p
@@ -31,7 +33,45 @@ final class Product
              WHERE p.slug = :slug AND p.status = :status LIMIT 1'
         );
         $stmt->execute(['slug' => $slug, 'status' => 'active']);
-        return $stmt->fetch() ?: null;
+        return $this->normalizeProductRow($stmt->fetch() ?: null);
+    }
+
+    /** @param array<string, mixed>|null $row */
+    private function normalizeProductRow(?array $row): ?array
+    {
+        if ($row === null) {
+            return null;
+        }
+
+        $colors = $row['colors'] ?? null;
+        if (is_string($colors) && $colors !== '') {
+            $decoded = json_decode($colors, true);
+            $row['colors'] = is_array($decoded) ? $decoded : [];
+        } elseif (!is_array($colors)) {
+            $row['colors'] = [];
+        }
+
+        $sizes = $row['sizes'] ?? null;
+        if (is_string($sizes) && $sizes !== '') {
+            $decodedSizes = json_decode($sizes, true);
+            $row['sizes'] = is_array($decodedSizes) ? $decodedSizes : [];
+        } elseif (!is_array($sizes)) {
+            $row['sizes'] = [];
+        }
+        // Migrate legacy single size_option into sizes when sizes is empty.
+        if ($row['sizes'] === [] && !empty($row['size_option']) && $row['size_option'] !== 'none') {
+            $row['sizes'] = [strtolower((string) $row['size_option'])];
+        }
+
+        $row['gst_applicable'] = (int) ($row['gst_applicable'] ?? 1);
+        $row['custom_shipping'] = (int) ($row['custom_shipping'] ?? 0);
+        $row['has_color_variants'] = (int) ($row['has_color_variants'] ?? 0);
+        $row['size_option'] = (string) ($row['size_option'] ?? 'none');
+        if (isset($row['shipping_price'])) {
+            $row['shipping_price'] = $row['shipping_price'] !== null ? (float) $row['shipping_price'] : null;
+        }
+
+        return $row;
     }
 
     public function getImages(int $productId): array
@@ -68,8 +108,14 @@ final class Product
         }
 
         if (!empty($filters['search'])) {
-            $where[] = '(p.name LIKE :search OR p.description LIKE :search OR p.sku LIKE :search)';
-            $params['search'] = '%' . $filters['search'] . '%';
+            $searchTerm = '%' . $filters['search'] . '%';
+            $where[] = '(p.name LIKE :search_name OR p.description LIKE :search_desc OR p.sku LIKE :search_sku
+                        OR c.name LIKE :search_cat OR b.name LIKE :search_brand)';
+            $params['search_name'] = $searchTerm;
+            $params['search_desc'] = $searchTerm;
+            $params['search_sku'] = $searchTerm;
+            $params['search_cat'] = $searchTerm;
+            $params['search_brand'] = $searchTerm;
         }
 
         if (isset($filters['min_price'])) {
@@ -118,15 +164,18 @@ final class Product
 
         $whereClause = implode(' AND ', $where);
 
-        $countStmt = $this->db->prepare("SELECT COUNT(*) FROM products p WHERE {$whereClause}");
+        $fromJoins = 'FROM products p
+                LEFT JOIN categories c ON c.id = p.category_id
+                LEFT JOIN brands b ON b.id = p.brand_id';
+
+        $countStmt = $this->db->prepare("SELECT COUNT(*) {$fromJoins} WHERE {$whereClause}");
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 
         $sql = "SELECT p.*, c.name as category_name, b.name as brand_name,
-                       (SELECT image_path FROM product_images pi WHERE pi.product_id = p.id AND pi.is_primary = 1 LIMIT 1) as primary_image
-                FROM products p
-                LEFT JOIN categories c ON c.id = p.category_id
-                LEFT JOIN brands b ON b.id = p.brand_id
+                       (SELECT image_path FROM product_images pi WHERE pi.product_id = p.id AND pi.is_primary = 1 LIMIT 1) as primary_image,
+                       " . Review::productSelectSql('p') . "
+                {$fromJoins}
                 WHERE {$whereClause}
                 ORDER BY {$orderBy}
                 LIMIT :limit OFFSET :offset";
@@ -139,7 +188,7 @@ final class Product
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
 
-        $items = $stmt->fetchAll();
+        $items = Review::enrichProducts($stmt->fetchAll());
         return ['items' => $this->attachImages($items), 'total' => $total];
     }
 

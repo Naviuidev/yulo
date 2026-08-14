@@ -8,6 +8,7 @@ final class ProductAdminController extends BaseController
 {
     public function index(array $params = []): void
     {
+        SchemaGuard::ensureProductCommerceOptions($this->db);
         $pagination = Pagination::resolve();
         $search = $_GET['search'] ?? '';
 
@@ -24,7 +25,8 @@ final class ProductAdminController extends BaseController
         $total = (int) $countStmt->fetchColumn();
 
         $stmt = $this->db->prepare(
-            "SELECT p.*, c.name as category_name, b.name as brand_name
+            "SELECT p.*, c.name as category_name, b.name as brand_name,
+                    " . Review::productSelectSql('p') . "
              FROM products p
              LEFT JOIN categories c ON c.id = p.category_id
              LEFT JOIN brands b ON b.id = p.brand_id
@@ -39,13 +41,14 @@ final class ProductAdminController extends BaseController
         $stmt->execute();
 
         $productModel = new Product($this->db);
-        $items = $productModel->attachImages($stmt->fetchAll());
+        $items = Review::enrichProducts($productModel->attachImages($stmt->fetchAll()));
 
         Response::jsonPaginate($items, $total, $pagination['page'], $pagination['per_page']);
     }
 
     public function show(array $params): void
     {
+        SchemaGuard::ensureProductCommerceOptions($this->db);
         $productModel = new Product($this->db);
         $product = $productModel->findById((int) $params['id']);
 
@@ -74,13 +77,18 @@ final class ProductAdminController extends BaseController
         }
 
         SchemaGuard::ensureHomeSections($this->db);
+        SchemaGuard::ensureProductCommerceOptions($this->db);
 
         try {
             $this->db->beginTransaction();
 
             $stmt = $this->db->prepare(
-                'INSERT INTO products (name, slug, description, short_description, sku, price, sale_price, stock, category_id, brand_id, status, is_featured, created_at, updated_at)
-                 VALUES (:name, :slug, :description, :short_description, :sku, :price, :sale_price, :stock, :category_id, :brand_id, :status, :is_featured, NOW(), NOW())'
+                'INSERT INTO products (name, slug, description, short_description, sku, price, sale_price, gst_applicable,
+                 custom_shipping, shipping_price, has_color_variants, colors, size_option, sizes,
+                 stock, category_id, brand_id, status, is_featured, created_at, updated_at)
+                 VALUES (:name, :slug, :description, :short_description, :sku, :price, :sale_price, :gst_applicable,
+                 :custom_shipping, :shipping_price, :has_color_variants, :colors, :size_option, :sizes,
+                 :stock, :category_id, :brand_id, :status, :is_featured, NOW(), NOW())'
             );
             $stmt->execute([
                 'name' => $input['name'],
@@ -90,6 +98,13 @@ final class ProductAdminController extends BaseController
                 'sku' => $input['sku'],
                 'price' => $input['price'],
                 'sale_price' => $input['sale_price'],
+                'gst_applicable' => $input['gst_applicable'],
+                'custom_shipping' => $input['custom_shipping'],
+                'shipping_price' => $input['shipping_price'],
+                'has_color_variants' => $input['has_color_variants'],
+                'colors' => $input['colors'],
+                'size_option' => $input['size_option'],
+                'sizes' => $input['sizes'],
                 'stock' => $input['stock'],
                 'category_id' => $input['category_id'],
                 'brand_id' => $input['brand_id'],
@@ -127,13 +142,17 @@ final class ProductAdminController extends BaseController
         }
 
         SchemaGuard::ensureHomeSections($this->db);
+        SchemaGuard::ensureProductCommerceOptions($this->db);
 
         try {
             $this->db->beginTransaction();
 
             $stmt = $this->db->prepare(
                 'UPDATE products SET name = :name, slug = :slug, description = :description, short_description = :short_description,
-                 sku = :sku, price = :price, sale_price = :sale_price, stock = :stock, category_id = :category_id, brand_id = :brand_id,
+                 sku = :sku, price = :price, sale_price = :sale_price, gst_applicable = :gst_applicable,
+                 custom_shipping = :custom_shipping, shipping_price = :shipping_price,
+                 has_color_variants = :has_color_variants, colors = :colors, size_option = :size_option, sizes = :sizes,
+                 stock = :stock, category_id = :category_id, brand_id = :brand_id,
                  status = :status, is_featured = :is_featured, updated_at = NOW() WHERE id = :id'
             );
             $stmt->execute([
@@ -144,6 +163,13 @@ final class ProductAdminController extends BaseController
                 'sku' => $input['sku'],
                 'price' => $input['price'],
                 'sale_price' => $input['sale_price'],
+                'gst_applicable' => $input['gst_applicable'],
+                'custom_shipping' => $input['custom_shipping'],
+                'shipping_price' => $input['shipping_price'],
+                'has_color_variants' => $input['has_color_variants'],
+                'colors' => $input['colors'],
+                'size_option' => $input['size_option'],
+                'sizes' => $input['sizes'],
                 'stock' => $input['stock'],
                 'category_id' => $input['category_id'],
                 'brand_id' => $input['brand_id'],
@@ -392,6 +418,11 @@ final class ProductAdminController extends BaseController
             $status = 'active';
         }
 
+        $customShipping = !empty($input['custom_shipping']) ? 1 : 0;
+        $hasColors = !empty($input['has_color_variants']) ? 1 : 0;
+        $sizes = $this->normalizeSizes($input['sizes'] ?? $input['size_option'] ?? []);
+        $sizeOption = $sizes === [] ? 'none' : $sizes[0];
+
         return [
             'name' => trim((string) ($input['name'] ?? '')),
             'slug' => trim((string) ($input['slug'] ?? '')),
@@ -405,9 +436,75 @@ final class ProductAdminController extends BaseController
             'brand_id' => $this->nullableInt($input['brand_id'] ?? null),
             'status' => $status,
             'is_featured' => !empty($input['is_featured']) ? 1 : 0,
+            'gst_applicable' => !empty($input['gst_applicable']) ? 1 : 0,
+            'custom_shipping' => $customShipping,
+            'shipping_price' => $customShipping ? $this->nullableNumber($input['shipping_price'] ?? null) : null,
+            'has_color_variants' => $hasColors,
+            'colors' => $this->normalizeColors($input['colors'] ?? [], (bool) $hasColors),
+            'size_option' => $sizeOption,
+            'sizes' => $sizes === [] ? null : json_encode($sizes, JSON_UNESCAPED_UNICODE),
             'images' => $input['images'] ?? [],
             'section_ids' => $input['section_ids'] ?? [],
         ];
+    }
+
+    /** @return list<string> */
+    private function normalizeSizes(mixed $raw): array
+    {
+        $allowed = ['sm', 'm', 'l', 'xl', 'xxl'];
+        if (is_string($raw)) {
+            $raw = $raw === '' || strtolower($raw) === 'none' ? [] : [$raw];
+        }
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $size) {
+            $key = strtolower(trim((string) $size));
+            if (in_array($key, $allowed, true) && !in_array($key, $out, true)) {
+                $out[] = $key;
+            }
+        }
+
+        return $out;
+    }
+
+    /** @return string|null JSON */
+    private function normalizeColors(mixed $raw, bool $enabled): ?string
+    {
+        if (!$enabled || !is_array($raw)) {
+            return null;
+        }
+
+        $out = [];
+        foreach (array_slice($raw, 0, 4) as $color) {
+            if (is_string($color)) {
+                $name = trim($color);
+                if ($name === '') {
+                    continue;
+                }
+                $out[] = ['name' => $name, 'hex' => '#000000'];
+                continue;
+            }
+            if (!is_array($color)) {
+                continue;
+            }
+            $name = trim((string) ($color['name'] ?? ''));
+            $hex = strtoupper(trim((string) ($color['hex'] ?? '#000000')));
+            if ($name === '' && ($hex === '' || $hex === '#000000') && empty($color['hex'])) {
+                continue;
+            }
+            if ($name === '') {
+                $name = $hex !== '' ? $hex : 'Color';
+            }
+            if (!preg_match('/^#[0-9A-F]{6}$/', $hex)) {
+                $hex = '#000000';
+            }
+            $out[] = ['name' => $name, 'hex' => $hex];
+        }
+
+        return $out === [] ? null : json_encode($out, JSON_UNESCAPED_UNICODE);
     }
 
     private function nullableString(mixed $value): ?string

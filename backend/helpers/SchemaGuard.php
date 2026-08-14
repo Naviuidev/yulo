@@ -98,6 +98,56 @@ final class SchemaGuard
         $ready = true;
     }
 
+    /** Per-product GST toggle (admin product form). */
+    public static function ensureProductGstApplicable(PDO $db): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+
+        self::ensureColumn(
+            $db,
+            'products',
+            'gst_applicable',
+            'TINYINT(1) NOT NULL DEFAULT 1'
+        );
+        $ready = true;
+    }
+
+    /** Shipping / color / size options on products (admin product form). */
+    public static function ensureProductCommerceOptions(PDO $db): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+
+        self::ensureProductGstApplicable($db);
+        self::ensureColumn($db, 'products', 'custom_shipping', 'TINYINT(1) NOT NULL DEFAULT 0');
+        self::ensureColumn($db, 'products', 'shipping_price', 'DECIMAL(12, 2) NULL');
+        self::ensureColumn($db, 'products', 'has_color_variants', 'TINYINT(1) NOT NULL DEFAULT 0');
+        self::ensureColumn($db, 'products', 'colors', 'JSON NULL');
+        self::ensureColumn($db, 'products', 'size_option', "VARCHAR(10) NOT NULL DEFAULT 'none'");
+        self::ensureColumn($db, 'products', 'sizes', 'JSON NULL');
+        $ready = true;
+    }
+
+    /** Persist selected color/size on cart lines and order lines. */
+    public static function ensureCartOrderItemOptions(PDO $db): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+
+        self::ensureColumn($db, 'cart_items', 'color', 'VARCHAR(100) NULL');
+        self::ensureColumn($db, 'cart_items', 'size', 'VARCHAR(20) NULL');
+        self::ensureColumn($db, 'order_items', 'color', 'VARCHAR(100) NULL');
+        self::ensureColumn($db, 'order_items', 'size', 'VARCHAR(20) NULL');
+        $ready = true;
+    }
+
     /** Customer tracking follow-up queries for admin Followups. */
     public static function ensureTrackingFollowups(PDO $db): void
     {
@@ -129,6 +179,73 @@ final class SchemaGuard
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
         );
 
+        $ready = true;
+    }
+
+    /** Storefront page-view tracking for admin Visitors analytics. */
+    public static function ensureVisitorPageViews(PDO $db): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+
+        $db->exec(
+            "CREATE TABLE IF NOT EXISTS visitor_page_views (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                visitor_id CHAR(36) NOT NULL,
+                session_id CHAR(36) NOT NULL,
+                user_id INT UNSIGNED NULL,
+                path VARCHAR(500) NOT NULL,
+                title VARCHAR(255) NULL,
+                referrer VARCHAR(500) NULL,
+                device_type VARCHAR(20) NOT NULL DEFAULT 'desktop',
+                user_agent VARCHAR(500) NULL,
+                ip_hash CHAR(64) NULL,
+                created_at DATETIME NOT NULL,
+                INDEX idx_vpv_created (created_at),
+                INDEX idx_vpv_visitor (visitor_id),
+                INDEX idx_vpv_session (session_id),
+                INDEX idx_vpv_path (path(191)),
+                INDEX idx_vpv_device (device_type)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+
+        $ready = true;
+    }
+
+    /** Per-admin read state for activity-feed notification keys. */
+    public static function ensureAdminNotificationReads(PDO $db): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+
+        $db->exec(
+            "CREATE TABLE IF NOT EXISTS admin_notification_reads (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                user_id INT UNSIGNED NOT NULL,
+                item_key VARCHAR(120) NOT NULL,
+                read_at DATETIME NOT NULL,
+                UNIQUE KEY uk_admin_notif_read (user_id, item_key),
+                INDEX idx_admin_notif_user (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+
+        $ready = true;
+    }
+
+    /** Review display name + optional avatar for testimonials / moderation. */
+    public static function ensureReviewExtras(PDO $db): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+
+        self::ensureColumn($db, 'reviews', 'display_name', 'VARCHAR(255) NULL');
+        self::ensureColumn($db, 'reviews', 'avatar_path', 'VARCHAR(500) NULL');
         $ready = true;
     }
 

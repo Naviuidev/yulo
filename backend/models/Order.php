@@ -30,6 +30,7 @@ final class Order
 
     public function getItems(int $orderId): array
     {
+        SchemaGuard::ensureCartOrderItemOptions($this->db);
         $stmt = $this->db->prepare(
             'SELECT oi.*, p.name as product_name, p.slug as product_slug,
                     (SELECT image_path FROM product_images WHERE product_id = p.id AND is_primary = 1 LIMIT 1) as image

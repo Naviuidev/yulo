@@ -95,21 +95,24 @@ final class OrderController extends BaseController
 
         if (!empty($input['coupon_code'])) {
             $couponModel = new Coupon($this->db);
-            $coupon = $couponModel->findByCode($input['coupon_code']);
+            $coupon = $couponModel->findByCode((string) $input['coupon_code']);
 
-            if ($coupon && ($coupon['expires_at'] === null || strtotime($coupon['expires_at']) > time())) {
-                if ($coupon['min_order_amount'] <= $subtotal) {
-                    $discount = $coupon['type'] === 'percentage'
-                        ? $subtotal * ($coupon['value'] / 100)
-                        : (float) $coupon['value'];
-                    $discount = min($discount, $subtotal);
-                    $couponId = $coupon['id'];
+            if ($coupon && !$couponModel->isExpired($coupon)) {
+                if ($coupon['max_uses'] === null || (int) $coupon['used_count'] < (int) $coupon['max_uses']) {
+                    if ((float) ($coupon['min_order_amount'] ?? 0) <= $subtotal) {
+                        $discount = $couponModel->calculateDiscount($coupon, (float) $subtotal);
+                        if ($discount > 0) {
+                            $couponId = (int) $coupon['id'];
+                        }
+                    }
                 }
             }
         }
 
-        $shipping = (float) ($input['shipping_charge'] ?? 0);
-        $tax = round(($subtotal - $discount) * 0.18, 2);
+        $shipping = array_key_exists('shipping_charge', $input)
+            ? (float) $input['shipping_charge']
+            : Pricing::shippingFromItems($items, (float) $subtotal);
+        $tax = Pricing::gstTaxFromItems($items, (float) $discount);
         $total = round($subtotal - $discount + $shipping + $tax, 2);
 
         try {
@@ -148,14 +151,19 @@ final class OrderController extends BaseController
             $orderId = (int) $this->db->lastInsertId();
 
             $itemStmt = $this->db->prepare(
-                'INSERT INTO order_items (order_id, product_id, variant_id, quantity, price, total, created_at)
-                 VALUES (:order_id, :product_id, :variant_id, :quantity, :price, :total, NOW())'
+                'INSERT INTO order_items (order_id, product_id, variant_id, quantity, price, total, color, size, created_at)
+                 VALUES (:order_id, :product_id, :variant_id, :quantity, :price, :total, :color, :size, NOW())'
             );
+
+            SchemaGuard::ensureCartOrderItemOptions($this->db);
 
             foreach ($items as $item) {
                 $variantId = !empty($item['variant_id']) ? (int) $item['variant_id'] : null;
                 $price = Pricing::unitPriceFromItem($item);
                 $lineTotal = $price * (int) $item['quantity'];
+
+                $color = isset($item['color']) ? trim((string) $item['color']) : '';
+                $size = isset($item['size']) ? trim((string) $item['size']) : '';
 
                 $itemStmt->execute([
                     'order_id' => $orderId,
@@ -164,6 +172,8 @@ final class OrderController extends BaseController
                     'quantity' => (int) $item['quantity'],
                     'price' => $price,
                     'total' => $lineTotal,
+                    'color' => $color !== '' ? mb_substr($color, 0, 100) : null,
+                    'size' => $size !== '' ? mb_substr($size, 0, 20) : null,
                 ]);
 
                 if ($variantId) {

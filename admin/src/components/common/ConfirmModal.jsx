@@ -27,12 +27,14 @@ const ConfirmModal = ({
               {children}
             </div>
             <div className="modal-footer border-0">
-              <button type="button" className="btn btn-light" onClick={onCancel}>
-                {cancelLabel}
-              </button>
+              {cancelLabel ? (
+                <button type="button" className="btn btn-light" onClick={onCancel}>
+                  {cancelLabel}
+                </button>
+              ) : null}
               <button
                 type="button"
-                className={`btn btn-${variant}`}
+                className={`btn btn-${variant === 'dark' ? 'dark' : variant === 'danger' ? 'danger' : 'dark'}`}
                 onClick={onConfirm}
                 disabled={confirmDisabled}
               >

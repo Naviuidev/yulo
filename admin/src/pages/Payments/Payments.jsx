@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-toastify';
 import PageHeader from '../../components/common/PageHeader';
+import PagePasswordGate from '../../components/common/PagePasswordGate';
 import Loader from '../../components/common/Loader';
 import paymentsService from '../../services/paymentsService';
 
@@ -13,7 +14,7 @@ const emptyForm = {
   webhook_url: '',
 };
 
-export default function Payments() {
+function PaymentsContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [secretKeySet, setSecretKeySet] = useState(false);
@@ -92,7 +93,7 @@ export default function Payments() {
       <form onSubmit={handleSubmit(onSubmit)} className="yulo-form-card">
         <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
           <h6 className="text-gold mb-0">Cashfree</h6>
-          <span className="badge text-bg-secondary">Sandbox + Production</span>
+          <span className="badge yulo-badge yulo-badge--light">Sandbox + Production</span>
         </div>
 
         <p className="text-muted small mb-4">
@@ -166,5 +167,18 @@ export default function Payments() {
         </button>
       </form>
     </>
+  );
+}
+
+export default function Payments() {
+  return (
+    <PagePasswordGate
+      id="payments"
+      password="Payments@1998"
+      title="Payments locked"
+      message="Enter the payments password to view and edit Cashfree credentials."
+    >
+      <PaymentsContent />
+    </PagePasswordGate>
   );
 }

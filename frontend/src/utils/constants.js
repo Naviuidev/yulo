@@ -1,7 +1,8 @@
 export const BRAND_NAME = 'YULO';
 export const BRAND_TAGLINE = 'WEAR YULO. LOOK AWESOME.';
+export const SITE_TITLE = 'YULO | Fashion, Accessories & More';
 export const BRAND_DESCRIPTION =
-  'Premium eyewear for the modern individual. Discover curated spectacles, sunglasses, and optical frames.';
+  'YULO — Fashion, accessories and more. Wear YULO, Look Awesome.';
 
 export const PLACEHOLDER_IMAGES = [
   'https://images.unsplash.com/photo-1508296695146-257a814070b4?w=800&q=80', // classic black sunglasses

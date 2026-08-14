@@ -141,10 +141,14 @@ final class OrderMailService
         $rows = '';
         foreach ($items as $item) {
             $title = htmlspecialchars((string) ($item['product_name'] ?? 'Item'), ENT_QUOTES, 'UTF-8');
+            $meta = $this->itemOptionsLabel($item);
+            $metaHtml = $meta !== ''
+                ? '<div style="font-size:12px;color:#888;margin-top:4px;">' . htmlspecialchars($meta, ENT_QUOTES, 'UTF-8') . '</div>'
+                : '';
             $qty = (int) ($item['quantity'] ?? 0);
             $line = $this->money((float) ($item['total'] ?? 0));
             $rows .= "<tr>
-                <td style=\"padding:10px 0;border-bottom:1px solid #eee;\">{$title}</td>
+                <td style=\"padding:10px 0;border-bottom:1px solid #eee;\">{$title}{$metaHtml}</td>
                 <td style=\"padding:10px 0;border-bottom:1px solid #eee;text-align:center;\">{$qty}</td>
                 <td style=\"padding:10px 0;border-bottom:1px solid #eee;text-align:right;\">{$line}</td>
               </tr>";
@@ -230,8 +234,12 @@ HTML;
         $itemLines = '';
         foreach ($items as $item) {
             $title = htmlspecialchars((string) ($item['product_name'] ?? 'Item'), ENT_QUOTES, 'UTF-8');
+            $meta = $this->itemOptionsLabel($item);
+            $metaHtml = $meta !== ''
+                ? ' <span style="color:#888;">(' . htmlspecialchars($meta, ENT_QUOTES, 'UTF-8') . ')</span>'
+                : '';
             $qty = (int) ($item['quantity'] ?? 0);
-            $itemLines .= "<li style=\"margin:0 0 6px;\">{$title} × {$qty}</li>";
+            $itemLines .= "<li style=\"margin:0 0 6px;\">{$title}{$metaHtml} × {$qty}</li>";
         }
 
         $shipping = $this->decodeAddress($order['shipping_address'] ?? null);
@@ -304,6 +312,21 @@ HTML;
         $parts = array_values(array_filter(array_map(static fn ($p) => trim((string) $p), $parts), static fn ($p) => $p !== '' && $p !== ','));
         $safe = array_map(static fn ($p) => htmlspecialchars($p, ENT_QUOTES, 'UTF-8'), $parts);
         return $safe === [] ? '—' : implode('<br>', $safe);
+    }
+
+    /** @param array<string, mixed> $item */
+    private function itemOptionsLabel(array $item): string
+    {
+        $bits = [];
+        $color = trim((string) ($item['color'] ?? ''));
+        $size = trim((string) ($item['size'] ?? ''));
+        if ($color !== '') {
+            $bits[] = 'Color: ' . $color;
+        }
+        if ($size !== '') {
+            $bits[] = 'Size: ' . $size;
+        }
+        return implode(' · ', $bits);
     }
 
     private function money(float $amount): string

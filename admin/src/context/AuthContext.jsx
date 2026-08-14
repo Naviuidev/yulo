@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import authService from '../services/authService';
+import { ADMIN_ROLES } from '../utils/constants';
 
 const AuthContext = createContext(null);
 
@@ -15,7 +16,7 @@ export const AuthProvider = ({ children }) => {
     }
     try {
       const me = await authService.me();
-      if (me?.role !== 'admin') {
+      if (!ADMIN_ROLES.includes(me?.role)) {
         await authService.logout();
         setUser(null);
       } else {

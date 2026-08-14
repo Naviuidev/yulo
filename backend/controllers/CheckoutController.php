@@ -18,8 +18,8 @@ final class CheckoutController extends BaseController
             $subtotal += Pricing::unitPriceFromItem($item) * (int) $item['quantity'];
         }
 
-        $shipping = $subtotal >= 999 ? 0 : 49;
-        $tax = round($subtotal * 0.18, 2);
+        $shipping = Pricing::shippingFromItems($items, (float) $subtotal, 999.0, 49.0);
+        $tax = Pricing::gstTaxFromItems($items, 0.0);
 
         $addrStmt = $this->db->prepare('SELECT * FROM addresses WHERE user_id = :user_id ORDER BY is_default DESC');
         $addrStmt->execute(['user_id' => $userId]);
@@ -89,20 +89,21 @@ final class CheckoutController extends BaseController
         $couponId = null;
         if (!empty($input['coupon_code'])) {
             $couponModel = new Coupon($this->db);
-            $coupon = $couponModel->findByCode($input['coupon_code']);
-            if ($coupon && ($coupon['expires_at'] === null || strtotime($coupon['expires_at']) > time())) {
-                if ((float) $coupon['min_order_amount'] <= $subtotal) {
-                    $discount = $coupon['type'] === 'percentage'
-                        ? $subtotal * ((float) $coupon['value'] / 100)
-                        : (float) $coupon['value'];
-                    $discount = min($discount, $subtotal);
-                    $couponId = (int) $coupon['id'];
+            $coupon = $couponModel->findByCode((string) $input['coupon_code']);
+            if ($coupon && !$couponModel->isExpired($coupon)) {
+                if ($coupon['max_uses'] === null || (int) $coupon['used_count'] < (int) $coupon['max_uses']) {
+                    if ((float) ($coupon['min_order_amount'] ?? 0) <= $subtotal) {
+                        $discount = $couponModel->calculateDiscount($coupon, $subtotal);
+                        if ($discount > 0) {
+                            $couponId = (int) $coupon['id'];
+                        }
+                    }
                 }
             }
         }
 
-        $shipping = (float) ($input['shipping_charge'] ?? ($subtotal >= 999 ? 0 : 99));
-        $tax = round(($subtotal - $discount) * 0.18, 2);
+        $shipping = Pricing::shippingFromItems($items, $subtotal);
+        $tax = Pricing::gstTaxFromItems($items, $discount);
         $total = round($subtotal - $discount + $shipping + $tax, 2);
 
         $orderId = 0;
@@ -138,9 +139,11 @@ final class CheckoutController extends BaseController
             $orderId = (int) $this->db->lastInsertId();
 
             $itemStmt = $this->db->prepare(
-                'INSERT INTO order_items (order_id, product_id, variant_id, quantity, price, total, created_at)
-                 VALUES (:order_id, :product_id, :variant_id, :quantity, :price, :total, NOW())'
+                'INSERT INTO order_items (order_id, product_id, variant_id, quantity, price, total, color, size, created_at)
+                 VALUES (:order_id, :product_id, :variant_id, :quantity, :price, :total, :color, :size, NOW())'
             );
+
+            SchemaGuard::ensureCartOrderItemOptions($this->db);
 
             foreach ($items as $item) {
                 $variantId = !empty($item['variant_id']) ? (int) $item['variant_id'] : null;
@@ -154,6 +157,8 @@ final class CheckoutController extends BaseController
                     'quantity' => (int) $item['quantity'],
                     'price' => $price,
                     'total' => $lineTotal,
+                    'color' => $this->nullableTrim($item['color'] ?? null, 100),
+                    'size' => $this->nullableTrim($item['size'] ?? null, 20),
                 ]);
 
                 if ($variantId) {
@@ -374,6 +379,8 @@ final class CheckoutController extends BaseController
             Response::jsonError('Invalid shipping address.', 422);
         }
 
+        SchemaGuard::ensureProductGstApplicable($this->db);
+
         $subtotal = 0;
         $lineItems = [];
 
@@ -384,7 +391,8 @@ final class CheckoutController extends BaseController
 
             if ($variantId) {
                 $stmt = $this->db->prepare(
-                    'SELECT pv.price, pv.sale_price, pv.stock, p.id as product_id
+                    'SELECT pv.price, pv.sale_price, pv.stock, p.id as product_id, p.gst_applicable,
+                            p.custom_shipping, p.shipping_price, p.sale_price AS product_sale_price
                      FROM product_variants pv JOIN products p ON p.id = pv.product_id
                      WHERE pv.id = :id AND p.id = :product_id AND p.status = :status LIMIT 1'
                 );
@@ -392,7 +400,8 @@ final class CheckoutController extends BaseController
                 $row = $stmt->fetch();
             } else {
                 $stmt = $this->db->prepare(
-                    'SELECT id as product_id, price, sale_price, stock FROM products WHERE id = :id AND status = :status LIMIT 1'
+                    'SELECT id as product_id, price, sale_price, stock, gst_applicable, custom_shipping, shipping_price
+                     FROM products WHERE id = :id AND status = :status LIMIT 1'
                 );
                 $stmt->execute(['id' => $productId, 'status' => 'active']);
                 $row = $stmt->fetch();
@@ -402,16 +411,31 @@ final class CheckoutController extends BaseController
                 Response::jsonError('One or more items are unavailable.', 422);
             }
 
-            $price = Pricing::effective(
-                isset($row['sale_price']) ? (float) $row['sale_price'] : null,
-                (float) $row['price']
-            );
+            $priceRow = [
+                'price' => $row['price'],
+                'sale_price' => $row['sale_price'] ?? $row['product_sale_price'] ?? null,
+                'variant_id' => $variantId,
+                'variant_price' => $variantId ? $row['price'] : null,
+                'variant_sale_price' => $variantId ? ($row['sale_price'] ?? null) : null,
+            ];
+            if ($variantId) {
+                // variant row: pv.sale_price is sale_price; product sale is product_sale_price
+                $priceRow['sale_price'] = $row['product_sale_price'] ?? null;
+                $priceRow['variant_sale_price'] = $row['sale_price'] ?? null;
+                $priceRow['variant_price'] = $row['price'];
+            }
+            $price = Pricing::unitPriceFromItem($priceRow);
             $subtotal += $price * $qty;
             $lineItems[] = [
                 'product_id' => $productId,
                 'variant_id' => $variantId,
                 'quantity' => $qty,
                 'price' => $price,
+                'gst_applicable' => (int) ($row['gst_applicable'] ?? 1),
+                'custom_shipping' => (int) ($row['custom_shipping'] ?? 0),
+                'shipping_price' => isset($row['shipping_price']) ? (float) $row['shipping_price'] : null,
+                'color' => $this->nullableTrim($raw['color'] ?? null, 100),
+                'size' => $this->nullableTrim($raw['size'] ?? null, 20),
             ];
         }
 
@@ -419,20 +443,21 @@ final class CheckoutController extends BaseController
         $couponId = null;
         if (!empty($input['coupon_code'])) {
             $couponModel = new Coupon($this->db);
-            $coupon = $couponModel->findByCode($input['coupon_code']);
-            if ($coupon && ($coupon['expires_at'] === null || strtotime($coupon['expires_at']) > time())) {
-                if ((float) $coupon['min_order_amount'] <= $subtotal) {
-                    $discount = $coupon['type'] === 'percentage'
-                        ? $subtotal * ((float) $coupon['value'] / 100)
-                        : (float) $coupon['value'];
-                    $discount = min($discount, $subtotal);
-                    $couponId = (int) $coupon['id'];
+            $coupon = $couponModel->findByCode((string) $input['coupon_code']);
+            if ($coupon && !$couponModel->isExpired($coupon)) {
+                if ($coupon['max_uses'] === null || (int) $coupon['used_count'] < (int) $coupon['max_uses']) {
+                    if ((float) ($coupon['min_order_amount'] ?? 0) <= $subtotal) {
+                        $discount = $couponModel->calculateDiscount($coupon, $subtotal);
+                        if ($discount > 0) {
+                            $couponId = (int) $coupon['id'];
+                        }
+                    }
                 }
             }
         }
 
-        $shipping = $subtotal >= 999 ? 0 : 49;
-        $tax = round(($subtotal - $discount) * 0.18, 2);
+        $shipping = Pricing::shippingFromItems($lineItems, (float) $subtotal, 999.0, 49.0);
+        $tax = Pricing::gstTaxFromItems($lineItems, (float) $discount);
         $total = round($subtotal - $discount + $shipping + $tax, 2);
         $paymentMethod = in_array($input['payment_method'] ?? '', ['phonepe', 'stripe', 'cod', 'upi', 'cashfree'], true)
             ? $input['payment_method']
@@ -469,9 +494,11 @@ final class CheckoutController extends BaseController
 
             $orderId = (int) $this->db->lastInsertId();
             $itemStmt = $this->db->prepare(
-                'INSERT INTO order_items (order_id, product_id, variant_id, quantity, price, total, created_at)
-                 VALUES (:order_id, :product_id, :variant_id, :quantity, :price, :total, NOW())'
+                'INSERT INTO order_items (order_id, product_id, variant_id, quantity, price, total, color, size, created_at)
+                 VALUES (:order_id, :product_id, :variant_id, :quantity, :price, :total, :color, :size, NOW())'
             );
+
+            SchemaGuard::ensureCartOrderItemOptions($this->db);
 
             foreach ($lineItems as $item) {
                 $itemStmt->execute([
@@ -481,6 +508,8 @@ final class CheckoutController extends BaseController
                     'quantity' => $item['quantity'],
                     'price' => $item['price'],
                     'total' => $item['price'] * $item['quantity'],
+                    'color' => $this->nullableTrim($item['color'] ?? null, 100),
+                    'size' => $this->nullableTrim($item['size'] ?? null, 20),
                 ]);
 
                 if (!empty($item['variant_id'])) {
@@ -519,5 +548,17 @@ final class CheckoutController extends BaseController
             error_log('Guest checkout failed: ' . $e->getMessage());
             Response::jsonError('Failed to place guest order.', 500);
         }
+    }
+
+    private function nullableTrim(mixed $value, int $maxLen): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $trimmed = trim((string) $value);
+        if ($trimmed === '') {
+            return null;
+        }
+        return mb_substr($trimmed, 0, $maxLen);
     }
 }

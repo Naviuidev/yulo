@@ -26,45 +26,72 @@ export const ORDER_STATUS_LABELS = {
 };
 
 export const STATUS_BADGE_MAP = {
-  pending: 'warning',
-  confirmed: 'info',
-  processing: 'primary',
-  packed: 'primary',
-  shipped: 'info',
-  out_for_delivery: 'info',
-  delivered: 'success',
-  cancelled: 'danger',
-  returned: 'secondary',
-  refunded: 'dark',
-  active: 'success',
-  inactive: 'secondary',
-  draft: 'secondary',
-  paid: 'success',
-  failed: 'danger',
-  shared_response: 'success',
+  pending: 'light',
+  approved: 'dark',
+  rejected: 'light',
+  confirmed: 'dark',
+  processing: 'dark',
+  packed: 'dark',
+  shipped: 'dark',
+  out_for_delivery: 'dark',
+  delivered: 'dark',
+  cancelled: 'light',
+  returned: 'light',
+  refunded: 'light',
+  active: 'dark',
+  inactive: 'light',
+  draft: 'light',
+  paid: 'dark',
+  failed: 'light',
+  shared_response: 'dark',
+  initiated: 'light',
+  completed: 'dark',
+  new: 'dark',
+  read: 'light',
+  replied: 'dark',
+  in_transit: 'dark',
 };
 
 export const NAV_ITEMS = [
-  { path: '/', icon: 'bi-speedometer2', label: 'Dashboard' },
-  { path: '/analytics', icon: 'bi-graph-up-arrow', label: 'Analytics' },
-  { path: '/revenue', icon: 'bi-currency-rupee', label: 'Revenue' },
-  { path: '/orders', icon: 'bi-bag-check', label: 'Orders' },
-  { path: '/customers', icon: 'bi-people', label: 'Customers' },
-  { path: '/products', icon: 'bi-box-seam', label: 'Products' },
-  { path: '/categories', icon: 'bi-tags', label: 'Categories' },
-  { path: '/brands', icon: 'bi-award', label: 'Brands & Sections' },
-  { path: '/inventory', icon: 'bi-boxes', label: 'Inventory' },
-  { path: '/coupons', icon: 'bi-ticket-perforated', label: 'Coupons' },
-  { path: '/deliveries', icon: 'bi-truck', label: 'Deliveries' },
-  { path: '/followups', icon: 'bi-chat-left-text', label: 'Followups' },
-  { path: '/reports', icon: 'bi-file-earmark-bar-graph', label: 'Reports' },
-  { path: '/banners', icon: 'bi-images', label: 'Banners' },
-  { path: '/offer-strips', icon: 'bi-megaphone', label: 'Offers' },
-  { path: '/blogs', icon: 'bi-journal-text', label: 'Blogs' },
-  { path: '/faqs', icon: 'bi-question-circle', label: 'FAQs' },
-  { path: '/notifications', icon: 'bi-bell', label: 'Notifications' },
-  { path: '/visitors', icon: 'bi-eye', label: 'Visitors' },
-  { path: '/payments', icon: 'bi-credit-card', label: 'Payments' },
-  { path: '/settings', icon: 'bi-gear', label: 'Settings' },
-  { path: '/doc', icon: 'bi-book', label: 'Doc' },
+  { path: '/', icon: 'bi-speedometer2', label: 'Dashboard', feature: 'dashboard' },
+  { path: '/orders', icon: 'bi-bag-check', label: 'Orders', feature: 'orders' },
+  { path: '/customers', icon: 'bi-people', label: 'Customers', feature: 'customers' },
+  { path: '/products', icon: 'bi-box-seam', label: 'Products', feature: 'products' },
+  { path: '/categories', icon: 'bi-tags', label: 'Categories', feature: 'categories' },
+  { path: '/brands', icon: 'bi-award', label: 'Brands & Sections', feature: 'brands' },
+  { path: '/inventory', icon: 'bi-boxes', label: 'Inventory', feature: 'inventory' },
+  { path: '/deliveries', icon: 'bi-truck', label: 'Deliveries', feature: 'deliveries' },
+  { path: '/followups', icon: 'bi-chat-left-text', label: 'Followups', feature: 'followups' },
+  { path: '/offer-strips', icon: 'bi-megaphone', label: 'Offers', feature: 'offer-strips' },
+  { path: '/faqs', icon: 'bi-question-circle', label: 'FAQs', feature: 'faqs' },
+  { path: '/reviews', icon: 'bi-star', label: 'Reviews', feature: 'reviews' },
+  { path: '/notifications', icon: 'bi-bell', label: 'Notifications', feature: 'notifications' },
+  { path: '/visitors', icon: 'bi-eye', label: 'Visitors', feature: 'visitors' },
+  { path: '/payments', icon: 'bi-credit-card', label: 'Payments', feature: 'payments' },
+  { path: '/social-connects', icon: 'bi-share', label: 'Configure Social Connects', feature: 'social-connects' },
+  { path: '/admin-config', icon: 'bi-shield-lock', label: 'Admin Config', feature: 'admin-config', masterOnly: true },
+  { path: '/doc', icon: 'bi-book', label: 'Doc', feature: 'doc' },
 ];
+
+export const ADMIN_ROLES = ['admin', 'super_admin', 'staff'];
+export const MASTER_ROLES = ['admin', 'super_admin'];
+
+export function isMasterAdmin(user) {
+  return MASTER_ROLES.includes(user?.role);
+}
+
+export function canAccessFeature(user, featureKey) {
+  if (!user) return false;
+  if (isMasterAdmin(user)) return true;
+  if (user.role !== 'staff') return false;
+  if (featureKey === 'admin-config') return false;
+  const perms = Array.isArray(user.permissions) ? user.permissions : [];
+  return perms.includes(featureKey);
+}
+
+export function navItemsForUser(user) {
+  return NAV_ITEMS.filter((item) => {
+    if (item.masterOnly) return isMasterAdmin(user);
+    return canAccessFeature(user, item.feature);
+  });
+}

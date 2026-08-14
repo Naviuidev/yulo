@@ -168,14 +168,22 @@ const OrderDetail = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {(order.items || []).map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.product_name || item.name}</td>
-                      <td>{item.quantity}</td>
-                      <td>{formatCurrency(item.price)}</td>
-                      <td>{formatCurrency(item.total)}</td>
-                    </tr>
-                  ))}
+                  {(order.items || []).map((item) => {
+                    const meta = [item.color && `Color: ${item.color}`, item.size && `Size: ${item.size}`]
+                      .filter(Boolean)
+                      .join(' · ');
+                    return (
+                      <tr key={item.id}>
+                        <td>
+                          <div className="fw-medium">{item.product_name || item.name}</div>
+                          {meta ? <div className="small text-muted mt-1">{meta}</div> : null}
+                        </td>
+                        <td>{item.quantity}</td>
+                        <td>{formatCurrency(item.price)}</td>
+                        <td>{formatCurrency(item.total)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -111,4 +111,21 @@ final class FeaturedCollectionAdminController extends BaseController
 
         return true;
     }
+
+    public function uploadImage(array $params = []): void
+    {
+        if (empty($_FILES['image'])) {
+            Response::jsonError('No image file uploaded.', 422);
+        }
+
+        $uploader = new Uploader();
+        $result = $uploader->upload($_FILES['image'], 'featured');
+
+        if (!($result['success'] ?? false)) {
+            Response::jsonError($result['message'] ?? 'Upload failed.', 422);
+        }
+
+        $path = '/' . ltrim((string) $result['path'], '/');
+        Response::jsonSuccess(['path' => $path, 'url' => $path], 'Featured image uploaded.');
+    }
 }

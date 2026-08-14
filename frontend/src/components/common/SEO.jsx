@@ -1,11 +1,11 @@
 import { Helmet } from 'react-helmet-async';
-import { BRAND_NAME } from '../../utils/constants';
+import { BRAND_NAME, SITE_TITLE } from '../../utils/constants';
 
 export default function SEO({ title, description, keywords, image, url }) {
-  const pageTitle = title ? `${title} | ${BRAND_NAME}` : `${BRAND_NAME} — Premium Fashion`;
+  const pageTitle = title ? `${title} | ${BRAND_NAME}` : SITE_TITLE;
   const desc =
     description ??
-    'Discover premium fashion at YULO. Minimalist elegance, curated collections, and timeless style.';
+    'Discover fashion, accessories and more at YULO. Wear YULO, Look Awesome.';
 
   return (
     <Helmet>

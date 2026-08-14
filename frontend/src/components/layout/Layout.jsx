@@ -5,6 +5,7 @@ import BottomNav from './BottomNav';
 import Footer from './Footer';
 import MobileMenu from './MobileMenu';
 import SearchOverlay from './SearchOverlay';
+import WhatsAppFloat from './WhatsAppFloat';
 import TrustBadges from '../common/TrustBadges';
 
 export default function Layout() {
@@ -19,6 +20,7 @@ export default function Layout() {
       </main>
       <TrustBadges />
       <Footer />
+      <WhatsAppFloat />
       <BottomNav />
     </div>
   );

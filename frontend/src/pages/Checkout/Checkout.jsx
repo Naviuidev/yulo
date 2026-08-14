@@ -8,7 +8,7 @@ import Modal from '../../components/ui/Modal';
 import AddressForm from '../../components/forms/AddressForm';
 import useCart from '../../hooks/useCart';
 import useAuth from '../../hooks/useAuth';
-import { formatPrice, getCartItemUnitPrice } from '../../utils/formatPrice';
+import { formatPrice, getCartGstTax, getCartItemUnitPrice, getCartShipping } from '../../utils/formatPrice';
 import { couponService, orderService } from '../../services/orderService';
 import { addressService } from '../../services/contentService';
 import { openCashfreeCheckout } from '../../utils/cashfreeCheckout';
@@ -37,6 +37,8 @@ export default function Checkout() {
   const [addressesLoaded, setAddressesLoaded] = useState(false);
   const [couponCode, setCouponCode] = useState('');
   const [discount, setDiscount] = useState(0);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponLoading, setCouponLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [addressSaving, setAddressSaving] = useState(false);
 
@@ -44,11 +46,10 @@ export default function Checkout() {
   const [modalMode, setModalMode] = useState('list'); // list | add | edit
   const [editingAddress, setEditingAddress] = useState(null);
 
-  const shipping = subtotal >= 999 ? 0 : 99;
-  // Match backend Cashfree total: sale subtotal − discount + shipping + 18% GST.
-  const taxable = Math.max(0, subtotal - discount);
-  const tax = Math.round(taxable * 0.18 * 100) / 100;
-  const total = Math.max(0, Math.round((taxable + shipping + tax) * 100) / 100);
+  const shipping = getCartShipping(items, subtotal);
+  // Match backend: GST only on products with gst_applicable enabled.
+  const tax = getCartGstTax(items, discount);
+  const total = Math.max(0, Math.round((subtotal - discount + shipping + tax) * 100) / 100);
 
   const selectedAddress = useMemo(
     () => addresses.find((a) => Number(a.id) === Number(selectedAddressId)) || null,
@@ -83,14 +84,41 @@ export default function Checkout() {
   }, [authLoading, isAuthenticated, navigate, loadAddresses]);
 
   const applyCoupon = async () => {
-    try {
-      const res = await couponService.validate(couponCode, subtotal);
-      const data = res.data?.data;
-      setDiscount(data?.discount_amount ?? 0);
-      toast.success('Coupon applied!');
-    } catch (err) {
-      toast.error(err.response?.data?.message ?? 'Invalid coupon');
+    const code = couponCode.trim();
+    if (!code) {
+      toast.error('Enter a coupon code');
+      return;
     }
+    setCouponLoading(true);
+    try {
+      const res = await couponService.validate(code, subtotal);
+      const data = res.data?.data;
+      const amount = Number(data?.discount ?? data?.discount_amount ?? 0);
+      if (!amount || amount <= 0) {
+        throw new Error('Coupon does not apply to this order');
+      }
+      setDiscount(amount);
+      setAppliedCoupon({
+        code: data?.code || code.toUpperCase(),
+        type: data?.type,
+        value: data?.value,
+        label: data?.label,
+      });
+      setCouponCode((data?.code || code).toUpperCase());
+      toast.success(data?.label ? `Coupon applied — ${data.label}` : 'Coupon applied!');
+    } catch (err) {
+      setDiscount(0);
+      setAppliedCoupon(null);
+      toast.error(err.response?.data?.message ?? err.message ?? 'Invalid coupon');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const clearCoupon = () => {
+    setDiscount(0);
+    setAppliedCoupon(null);
+    setCouponCode('');
   };
 
   const openChangeAddress = () => {
@@ -276,30 +304,64 @@ export default function Checkout() {
                   <div key={item.id} className="d-flex justify-content-between small mb-2">
                     <span>
                       {item.name} × {item.quantity}
+                      {(item.color || item.size) ? (
+                        <span className="text-muted">
+                          {' '}
+                          ({[item.color && `Color: ${item.color}`, item.size && `Size: ${item.size}`].filter(Boolean).join(' · ')})
+                        </span>
+                      ) : null}
                     </span>
                     <span>{formatPrice(unit * item.quantity, 'INR', 2)}</span>
                   </div>
                 );
               })}
               <hr />
-              <div className="d-flex gap-2 mb-3">
+              <div className="d-flex gap-2 mb-2">
                 <input
-                  className="form-control form-control-sm"
+                  className="form-control form-control-sm text-uppercase"
                   placeholder="Coupon code"
                   value={couponCode}
+                  disabled={!!appliedCoupon || couponLoading}
                   onChange={(e) => setCouponCode(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (!appliedCoupon) applyCoupon();
+                    }
+                  }}
                 />
-                <Button variant="outline" onClick={applyCoupon}>
-                  Apply
-                </Button>
+                {appliedCoupon ? (
+                  <Button variant="outline" onClick={clearCoupon}>
+                    Remove
+                  </Button>
+                ) : (
+                  <Button variant="outline" loading={couponLoading} onClick={applyCoupon}>
+                    Apply
+                  </Button>
+                )}
               </div>
+              {appliedCoupon ? (
+                <p className="small text-success mb-3">
+                  {appliedCoupon.code}
+                  {appliedCoupon.label ? ` · ${appliedCoupon.label}` : ''}
+                </p>
+              ) : (
+                <div className="mb-3" />
+              )}
               <div className="d-flex justify-content-between mb-2">
                 <span>Subtotal</span>
                 <span>{formatPrice(subtotal, 'INR', 2)}</span>
               </div>
               {discount > 0 && (
                 <div className="d-flex justify-content-between mb-2 text-success">
-                  <span>Discount</span>
+                  <span>
+                    Discount
+                    {appliedCoupon?.type === 'percentage'
+                      ? ` (${appliedCoupon.value}%)`
+                      : appliedCoupon?.type === 'fixed'
+                        ? ' (flat)'
+                        : ''}
+                  </span>
                   <span>-{formatPrice(discount, 'INR', 2)}</span>
                 </div>
               )}
@@ -308,8 +370,8 @@ export default function Checkout() {
                 <span>{shipping === 0 ? 'Free' : formatPrice(shipping, 'INR', 2)}</span>
               </div>
               <div className="d-flex justify-content-between mb-2 text-muted small">
-                <span>GST (18%)</span>
-                <span>{formatPrice(tax, 'INR', 2)}</span>
+                <span>{tax > 0 ? 'GST (18%)' : 'GST'}</span>
+                <span>{tax > 0 ? formatPrice(tax, 'INR', 2) : 'Not applicable'}</span>
               </div>
               <hr />
               <div className="d-flex justify-content-between fw-semibold mb-4">

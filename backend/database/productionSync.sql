@@ -412,21 +412,21 @@ UPDATE settings SET is_public = 0, `group` = 'branding' WHERE `key` = 'favicon_u
 UPDATE settings SET is_public = 1, `group` = 'branding' WHERE `key` = 'favicon_published';
 
 -- ###########################################################################
--- OPTIONAL: master admin → 992201351702 / Hosur@1998  (uncomment if needed)
+-- Master admin login → User ID 992201351702 / Password Hosur@1998
 -- ###########################################################################
--- UPDATE users
--- SET
---   email = '992201351702',
---   password = '$2y$12$MlhRPNX7eQ.NZiFE55/cYOU9E2BS5ChDeOromwdP5BQu/HLlyU2mm',
---   role = 'admin',
---   status = 'active',
---   email_verified_at = COALESCE(email_verified_at, NOW()),
---   updated_at = NOW()
--- WHERE id = (
---   SELECT id FROM (
---     SELECT id FROM users WHERE role IN ('admin', 'super_admin') ORDER BY id ASC LIMIT 1
---   ) AS t
--- );
+UPDATE users
+SET
+  email = '992201351702',
+  password = '$2y$12$MlhRPNX7eQ.NZiFE55/cYOU9E2BS5ChDeOromwdP5BQu/HLlyU2mm',
+  role = 'admin',
+  status = 'active',
+  email_verified_at = COALESCE(email_verified_at, NOW()),
+  updated_at = NOW()
+WHERE id = (
+  SELECT id FROM (
+    SELECT id FROM users WHERE role IN ('admin', 'super_admin') ORDER BY id ASC LIMIT 1
+  ) AS t
+);
 
 -- =============================================================================
 -- Verify after import:

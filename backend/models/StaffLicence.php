@@ -21,7 +21,9 @@ final class StaffLicence
         ['key' => 'notifications', 'label' => 'Notifications', 'path' => '/notifications'],
         ['key' => 'visitors', 'label' => 'Visitors', 'path' => '/visitors'],
         ['key' => 'payments', 'label' => 'Payments', 'path' => '/payments'],
-        ['key' => 'social-connects', 'label' => 'Social Connects', 'path' => '/social-connects'],
+        ['key' => 'social-connects', 'label' => 'Configure Social Connects', 'path' => '/social-connects'],
+        ['key' => 'marketing', 'label' => 'Marketing', 'path' => '/marketing'],
+        ['key' => 'marketing-free', 'label' => 'Marketing (Paid)', 'path' => '/marketing-free'],
         ['key' => 'doc', 'label' => 'Doc', 'path' => '/doc'],
     ];
 

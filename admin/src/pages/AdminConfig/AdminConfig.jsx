@@ -4,7 +4,7 @@ import { toast } from 'react-toastify';
 import PageHeader from '../../components/common/PageHeader';
 import ConfirmModal from '../../components/common/ConfirmModal';
 import staffLicenceService from '../../services/staffLicenceService';
-import { isMasterAdmin } from '../../utils/constants';
+import { isMasterAdmin, STAFF_FEATURE_OPTIONS } from '../../utils/constants';
 import { useAuth } from '../../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
@@ -20,25 +20,8 @@ const STEPS = [
   { id: 4, label: 'Share access' },
 ];
 
-const FEATURE_LABELS = {
-  dashboard: 'Dashboard',
-  orders: 'Orders',
-  customers: 'Customers',
-  products: 'Products',
-  categories: 'Categories',
-  brands: 'Brands & Sections',
-  inventory: 'Inventory',
-  deliveries: 'Deliveries',
-  followups: 'Followups',
-  'offer-strips': 'Offers',
-  faqs: 'FAQs',
-  reviews: 'Reviews',
-  notifications: 'Notifications',
-  visitors: 'Visitors',
-  payments: 'Payments',
-  'social-connects': 'Social Connects',
-  doc: 'Doc',
-};
+const FEATURE_LABELS = Object.fromEntries(STAFF_FEATURE_OPTIONS.map((f) => [f.key, f.label]));
+const FEATURE_OPTIONS = STAFF_FEATURE_OPTIONS;
 
 const STATUS_LABELS = {
   awaiting_dev_otp: 'Awaiting OTP',
@@ -50,8 +33,6 @@ const STATUS_LABELS = {
   banned: 'Banned',
   cancelled: 'Cancelled',
 };
-
-const FEATURE_OPTIONS = Object.entries(FEATURE_LABELS).map(([key, label]) => ({ key, label }));
 
 function formatFeatures(keys = []) {
   return keys.map((k) => FEATURE_LABELS[k] || k).join(', ') || '—';
@@ -306,6 +287,7 @@ function LicencesPanel() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editFeatures, setEditFeatures] = useState([]);
   const [savingFeatures, setSavingFeatures] = useState(false);
+  const [featureOptions, setFeatureOptions] = useState(FEATURE_OPTIONS);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -322,6 +304,23 @@ function LicencesPanel() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await staffLicenceService.getFeatures();
+        if (!cancelled && Array.isArray(data) && data.length) {
+          setFeatureOptions(data.map((f) => ({ key: f.key, label: f.label || f.key })));
+        }
+      } catch {
+        /* keep STAFF_FEATURE_OPTIONS fallback */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const selected = useMemo(
     () => items.find((item) => item.id === selectedId) || null,
@@ -450,7 +449,7 @@ function LicencesPanel() {
       onCancel={() => setSettingsOpen(false)}
     >
       <div className="yulo-licence-features mt-3">
-        {FEATURE_OPTIONS.map((f) => (
+        {featureOptions.map((f) => (
           <label key={f.key} className={`yulo-licence-feature ${editFeatures.includes(f.key) ? 'is-on' : ''}`}>
             <input
               type="checkbox"

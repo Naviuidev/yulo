@@ -78,8 +78,8 @@ export const NAV_ITEMS = [
   { path: '/visitors', icon: 'bi-eye', label: 'Visitors', feature: 'visitors' },
   { path: '/payments', icon: 'bi-credit-card', label: 'Payments', feature: 'payments' },
   { path: '/social-connects', icon: 'bi-share', label: 'Configure Social Connects', feature: 'social-connects' },
-  { path: '/marketing', icon: 'bi-broadcast', label: 'Marketing', feature: 'marketing', masterOnly: true },
-  { path: '/marketing-free', icon: 'bi-broadcast-pin', label: 'Marketing', feature: 'marketing-free', masterOnly: true, badge: 'Paid' },
+  { path: '/marketing', icon: 'bi-broadcast', label: 'Marketing', feature: 'marketing' },
+  { path: '/marketing-free', icon: 'bi-broadcast-pin', label: 'Marketing', feature: 'marketing-free', badge: 'Paid' },
   { path: '/admin-config', icon: 'bi-shield-lock', label: 'Admin Config', feature: 'admin-config', masterOnly: true },
   { path: '/doc', icon: 'bi-book', label: 'Doc', feature: 'doc' },
 ];
@@ -91,11 +91,17 @@ export function isMasterAdmin(user) {
   return MASTER_ROLES.includes(user?.role);
 }
 
+/** Staff-assignable features (excludes master-only nav items). */
+export const STAFF_FEATURE_OPTIONS = NAV_ITEMS.filter((item) => !item.masterOnly).map((item) => ({
+  key: item.feature,
+  label: item.feature === 'marketing-free' ? 'Marketing (Paid)' : item.label,
+}));
+
 export function canAccessFeature(user, featureKey) {
   if (!user) return false;
   if (isMasterAdmin(user)) return true;
   if (user.role !== 'staff') return false;
-  if (featureKey === 'admin-config' || featureKey === 'marketing' || featureKey === 'marketing-free') return false;
+  if (featureKey === 'admin-config') return false;
   const perms = Array.isArray(user.permissions) ? user.permissions : [];
   return perms.includes(featureKey);
 }

@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Navigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import PageHeader from '../../components/common/PageHeader';
 import DataTable from '../../components/common/DataTable';
 import StatusBadge from '../../components/common/StatusBadge';
-import { useAuth } from '../../context/AuthContext';
 import marketingService from '../../services/marketingService';
-import { isMasterAdmin } from '../../utils/constants';
 import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatters';
 import { resolveMediaUrl } from '../../utils/media';
 
@@ -614,12 +611,7 @@ function DigitalMarketingPanel() {
 }
 
 export default function Marketing() {
-  const { user } = useAuth();
   const [tab, setTab] = useState('users');
-
-  if (!isMasterAdmin(user)) {
-    return <Navigate to="/" replace />;
-  }
 
   return (
     <>
@@ -629,9 +621,6 @@ export default function Marketing() {
       <PageHeader
         title="Marketing"
         subtitle="Users, customers, subscribers, digital mail, and triggered campaigns."
-        actions={
-          <span className="btn btn-dark rounded-pill btn-sm px-3">Paid</span>
-        }
       />
 
       <div className="yulo-doc-cats mb-4">

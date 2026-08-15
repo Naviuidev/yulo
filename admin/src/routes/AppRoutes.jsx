@@ -38,9 +38,7 @@ function FeatureRoute({ feature, children }) {
   if (!user) return <Navigate to="/login" replace />;
 
   const allowed =
-    feature === 'admin-config' || feature === 'marketing' || feature === 'marketing-free'
-      ? isMasterAdmin(user)
-      : canAccessFeature(user, feature);
+    feature === 'admin-config' ? isMasterAdmin(user) : canAccessFeature(user, feature);
 
   if (!allowed) {
     const fallback = navItemsForUser(user)[0]?.path || '/login';

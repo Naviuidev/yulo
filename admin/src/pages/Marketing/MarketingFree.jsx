@@ -1,8 +1,5 @@
 import { Helmet } from 'react-helmet-async';
-import { Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useAuth } from '../../context/AuthContext';
-import { isMasterAdmin } from '../../utils/constants';
 
 const FLOW_STEPS = [
   { id: 'audience', label: 'Audience', icon: 'bi-people' },
@@ -12,16 +9,10 @@ const FLOW_STEPS = [
 ];
 
 export default function MarketingFree() {
-  const { user } = useAuth();
-
-  if (!isMasterAdmin(user)) {
-    return <Navigate to="/" replace />;
-  }
-
   return (
     <>
       <Helmet>
-        <title>Marketing (Free) — YULO Admin</title>
+        <title>Marketing (Paid) — YULO Admin</title>
       </Helmet>
 
       <div className="yulo-mkt-free-upgrade">

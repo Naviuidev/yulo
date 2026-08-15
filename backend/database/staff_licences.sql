@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS admin_staff_licences (
     'pending_approval',
     'approved',
     'rejected',
-    'cancelled'
+    'cancelled',
+    'banned',
+    'deleted'
   ) NOT NULL DEFAULT 'awaiting_dev_otp',
   developer_otp_hash VARCHAR(255) NULL,
   developer_otp_expires DATETIME NULL,

@@ -5,6 +5,9 @@
 --   1. Select the production database on the left
 --   2. Import this file  OR  SQL tab → paste → Go
 --
+-- For THIS release delta only (staff licence banned/deleted), prefer the smaller:
+--   backend/database/productionReady.sql
+--
 -- Covers feature tables / columns added after the original schema:
 --   • home_sections + product_home_sections (+ flash sale schedule cols)
 --   • offer_strips, featured_collections, offer_cards
@@ -177,7 +180,9 @@ CREATE TABLE IF NOT EXISTS admin_staff_licences (
         'pending_approval',
         'approved',
         'rejected',
-        'cancelled'
+        'cancelled',
+        'banned',
+        'deleted'
     ) NOT NULL DEFAULT 'awaiting_dev_otp',
     developer_otp_hash VARCHAR(255) NULL,
     developer_otp_expires DATETIME NULL,
@@ -206,6 +211,20 @@ CREATE TABLE IF NOT EXISTS admin_staff_licences (
 ALTER TABLE users
   MODIFY COLUMN role ENUM('customer', 'admin', 'super_admin', 'staff')
   NOT NULL DEFAULT 'customer';
+
+-- B1b) staff licence status includes banned + deleted
+ALTER TABLE admin_staff_licences
+  MODIFY COLUMN status ENUM(
+    'awaiting_dev_otp',
+    'features_pending',
+    'invite_sent',
+    'pending_approval',
+    'approved',
+    'rejected',
+    'cancelled',
+    'banned',
+    'deleted'
+  ) NOT NULL DEFAULT 'awaiting_dev_otp';
 
 -- B2) users.permissions
 SET @sql := (

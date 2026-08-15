@@ -9,8 +9,18 @@ const ConfirmModal = ({
   onCancel,
   variant = 'danger',
   confirmDisabled = false,
+  pill = false,
+  confirmIcon = null,
 }) => {
   if (!show) return null;
+
+  const shape = pill ? ' rounded-pill px-4' : '';
+  const cancelClass = pill ? `btn btn-outline-dark${shape}` : 'btn btn-light';
+
+  let confirmClass = `btn btn-dark${shape}`;
+  if (variant === 'outline-dark') confirmClass = `btn btn-outline-dark${shape}`;
+  else if (variant === 'danger') confirmClass = `btn btn-danger${shape}`;
+  else if (variant === 'dark') confirmClass = `btn btn-dark${shape}`;
 
   return (
     <>
@@ -26,18 +36,24 @@ const ConfirmModal = ({
               {message ? <p className="mb-0">{message}</p> : null}
               {children}
             </div>
-            <div className="modal-footer border-0">
+            <div className="modal-footer border-0 gap-2">
               {cancelLabel ? (
-                <button type="button" className="btn btn-light" onClick={onCancel}>
+                <button
+                  type="button"
+                  className={cancelClass}
+                  onClick={onCancel}
+                  disabled={confirmDisabled}
+                >
                   {cancelLabel}
                 </button>
               ) : null}
               <button
                 type="button"
-                className={`btn btn-${variant === 'dark' ? 'dark' : variant === 'danger' ? 'danger' : 'dark'}`}
+                className={confirmClass}
                 onClick={onConfirm}
                 disabled={confirmDisabled}
               >
+                {confirmIcon ? <i className={`bi ${confirmIcon} me-1`} aria-hidden="true" /> : null}
                 {confirmLabel}
               </button>
             </div>

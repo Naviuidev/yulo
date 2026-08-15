@@ -278,6 +278,11 @@ $router->group('/admin', function (Router $router) use ($admin) {
     $router->post('/staff-licences/start', [StaffLicenceAdminController::class, 'start'], $admin);
     $router->post('/staff-licences/{id}/verify-dev-otp', [StaffLicenceAdminController::class, 'verifyDevOtp'], $admin);
     $router->post('/staff-licences/{id}/features', [StaffLicenceAdminController::class, 'assignFeatures'], $admin);
+    $router->patch('/staff-licences/{id}/features', [StaffLicenceAdminController::class, 'updateFeatures'], $admin);
+    $router->post('/staff-licences/{id}/send-invite', [StaffLicenceAdminController::class, 'sendInvite'], $admin);
     $router->post('/staff-licences/{id}/approve', [StaffLicenceAdminController::class, 'approve'], $admin);
     $router->post('/staff-licences/{id}/reject', [StaffLicenceAdminController::class, 'reject'], $admin);
+    $router->post('/staff-licences/{id}/ban', [StaffLicenceAdminController::class, 'ban'], $admin);
+    $router->post('/staff-licences/{id}/unban', [StaffLicenceAdminController::class, 'unban'], $admin);
+    $router->delete('/staff-licences/{id}', [StaffLicenceAdminController::class, 'destroy'], $admin);
 });

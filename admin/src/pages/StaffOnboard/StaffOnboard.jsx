@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { toast } from 'react-toastify';
+import { motion } from 'framer-motion';
 import { staffOnboardService } from '../../services/staffLicenceService';
 import YuloLogo from '../../components/common/YuloLogo';
+import { useAuth } from '../../context/AuthContext';
+
+const LOGIN_HERO_IMG =
+  'https://i.postimg.cc/yNs3B4gL/file-000000006b488208884958b1ad97d7fb.png';
 
 const STEPS = [
   { id: 1, label: 'Verify email OTP' },
@@ -12,6 +17,8 @@ const STEPS = [
 
 export default function StaffOnboard() {
   const { token } = useParams();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [info, setInfo] = useState(null);
@@ -25,6 +32,7 @@ export default function StaffOnboard() {
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [goingLogin, setGoingLogin] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -105,140 +113,178 @@ export default function StaffOnboard() {
     }
   };
 
+  const goToLogin = async () => {
+    setGoingLogin(true);
+    try {
+      await logout();
+    } catch {
+      /* ignore */
+    }
+    navigate('/login?fresh=1', { replace: true });
+  };
+
   return (
     <>
       <Helmet>
         <title>Staff setup — YULO Admin</title>
       </Helmet>
-      <div className="yulo-login">
-        <div className="yulo-login__card" style={{ maxWidth: 480 }}>
-          <div className="yulo-login__header">
-            <YuloLogo variant="light" className="yulo-login__logo" />
-            <h1 className="yulo-login__title">Staff access setup</h1>
-            <p className="yulo-login__subtitle">Complete your invite to join YULO Admin</p>
-          </div>
+      <div className="yulo-login-page">
+        <div className="yulo-login-page__visual" aria-hidden="true">
+          <img
+            src={LOGIN_HERO_IMG}
+            alt=""
+            className="yulo-login-page__img"
+            decoding="async"
+          />
+        </div>
 
-          {loading ? (
-            <p className="yulo-onboard-msg text-center">Loading invite…</p>
-          ) : error ? (
-            <div className="text-center">
-              <p className="yulo-onboard-msg yulo-onboard-msg--error mb-3">{error}</p>
-              <Link to="/login" className="yulo-login__btn d-inline-flex justify-content-center text-decoration-none">
-                Go to login
-              </Link>
+        <div className="yulo-login-page__panel">
+          <motion.div
+            className="yulo-login-page__content"
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+          >
+            <div className="yulo-login__header">
+              <YuloLogo variant="light" className="yulo-login__logo" />
+              <h1 className="yulo-login__title">Staff access setup</h1>
+              <p className="yulo-login__subtitle">Complete your invite to join YULO Admin</p>
             </div>
-          ) : done ? (
-            <div className="text-center">
-              <p className="yulo-onboard-msg mb-3">
-                Your setup is complete and waiting for <strong>master admin approval</strong>.
-                You will receive a welcome email when approved.
-              </p>
-              <Link to="/login" className="yulo-login__btn d-inline-flex justify-content-center text-decoration-none">
-                Back to login
-              </Link>
-            </div>
-          ) : (
-            <>
-              <nav className="yulo-licence-steps yulo-licence-steps--on-dark mb-4" aria-label="Setup steps">
-                {STEPS.map((s) => (
-                  <span
-                    key={s.id}
-                    className={`yulo-licence-step ${step === s.id ? 'is-active' : ''} ${step > s.id ? 'is-done' : ''}`}
-                  >
-                    <em>{s.id}</em>
-                    {s.label}
-                  </span>
-                ))}
-              </nav>
 
-              {step === 1 && (
-                <form className="yulo-login__form" onSubmit={verifyOtp}>
-                  <div className="yulo-login__field">
-                    <label htmlFor="so-email">Your email</label>
-                    <input
-                      id="so-email"
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      readOnly={!!info?.staff_email}
-                    />
-                  </div>
-                  <div className="d-flex gap-2 mb-1">
-                    <button
-                      type="button"
-                      className="yulo-login__btn yulo-login__btn--ghost flex-grow-1"
-                      onClick={sendOtp}
-                      disabled={busy}
+            {loading ? (
+              <p className="yulo-onboard-msg text-center">Loading invite…</p>
+            ) : error ? (
+              <div className="text-center">
+                <p className="yulo-onboard-msg yulo-onboard-msg--error mb-3">{error}</p>
+                <button
+                  type="button"
+                  className="btn btn-outline-light rounded-pill px-4"
+                  disabled={goingLogin}
+                  onClick={goToLogin}
+                >
+                  <i className="bi bi-box-arrow-in-right me-1" aria-hidden="true" />
+                  {goingLogin ? 'Redirecting…' : 'Go to login'}
+                </button>
+              </div>
+            ) : done ? (
+              <div className="text-center">
+                <p className="yulo-onboard-msg mb-3">
+                  Your setup is complete and waiting for <strong>master admin approval</strong>.
+                  You will receive a welcome email when approved.
+                </p>
+                <button
+                  type="button"
+                  className="btn btn-outline-light rounded-pill px-4"
+                  disabled={goingLogin}
+                  onClick={goToLogin}
+                >
+                  <i className="bi bi-box-arrow-in-right me-1" aria-hidden="true" />
+                  {goingLogin ? 'Redirecting…' : 'Back to login'}
+                </button>
+              </div>
+            ) : (
+              <>
+                <nav className="yulo-licence-steps yulo-licence-steps--on-dark mb-4" aria-label="Setup steps">
+                  {STEPS.map((s) => (
+                    <span
+                      key={s.id}
+                      className={`yulo-licence-step ${step === s.id ? 'is-active' : ''} ${step > s.id ? 'is-done' : ''}`}
                     >
-                      {otpSent ? 'Resend OTP' : 'Send OTP'}
-                    </button>
-                  </div>
-                  <div className="yulo-login__field">
-                    <label htmlFor="so-otp">OTP</label>
-                    <input
-                      id="so-otp"
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      required
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="6-digit code"
-                    />
-                  </div>
-                  <button type="submit" className="yulo-login__btn" disabled={busy || otp.length !== 6}>
-                    Verify OTP
-                  </button>
-                </form>
-              )}
+                      <em>{s.id}</em>
+                      {s.label}
+                    </span>
+                  ))}
+                </nav>
 
-              {step === 2 && (
-                <form className="yulo-login__form" onSubmit={complete}>
-                  <div className="yulo-login__field">
-                    <label htmlFor="so-name">Display name</label>
-                    <input id="so-name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
-                  </div>
-                  <div className="yulo-login__field">
-                    <label htmlFor="so-temp">Temporary password</label>
-                    <input
-                      id="so-temp"
-                      type="text"
-                      required
-                      value={tempPassword}
-                      onChange={(e) => setTempPassword(e.target.value)}
-                      placeholder="From your invite email"
-                    />
-                  </div>
-                  <div className="yulo-login__field">
-                    <label htmlFor="so-pass">New password</label>
-                    <input
-                      id="so-pass"
-                      type="password"
-                      required
-                      minLength={8}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                  </div>
-                  <div className="yulo-login__field">
-                    <label htmlFor="so-pass2">Confirm password</label>
-                    <input
-                      id="so-pass2"
-                      type="password"
-                      required
-                      minLength={8}
-                      value={passwordConfirmation}
-                      onChange={(e) => setPasswordConfirmation(e.target.value)}
-                    />
-                  </div>
-                  <button type="submit" className="yulo-login__btn" disabled={busy}>
-                    Submit for approval
-                  </button>
-                </form>
-              )}
-            </>
-          )}
+                {step === 1 && (
+                  <form className="yulo-login__form" onSubmit={verifyOtp}>
+                    <div className="yulo-login__field">
+                      <label htmlFor="so-email">Your email</label>
+                      <input
+                        id="so-email"
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        readOnly={!!info?.staff_email}
+                      />
+                    </div>
+                    <div className="d-flex gap-2 mb-1">
+                      <button
+                        type="button"
+                        className="yulo-login__btn yulo-login__btn--ghost flex-grow-1"
+                        onClick={sendOtp}
+                        disabled={busy}
+                      >
+                        {otpSent ? 'Resend OTP' : 'Send OTP'}
+                      </button>
+                    </div>
+                    <div className="yulo-login__field">
+                      <label htmlFor="so-otp">OTP</label>
+                      <input
+                        id="so-otp"
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        required
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="6-digit code"
+                      />
+                    </div>
+                    <button type="submit" className="yulo-login__btn" disabled={busy || otp.length !== 6}>
+                      {busy ? <span className="spinner-border spinner-border-sm" /> : 'Verify OTP'}
+                    </button>
+                  </form>
+                )}
+
+                {step === 2 && (
+                  <form className="yulo-login__form" onSubmit={complete}>
+                    <div className="yulo-login__field">
+                      <label htmlFor="so-name">Display name</label>
+                      <input id="so-name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+                    </div>
+                    <div className="yulo-login__field">
+                      <label htmlFor="so-temp">Temporary password</label>
+                      <input
+                        id="so-temp"
+                        type="text"
+                        required
+                        value={tempPassword}
+                        onChange={(e) => setTempPassword(e.target.value)}
+                        placeholder="From your invite email"
+                      />
+                    </div>
+                    <div className="yulo-login__field">
+                      <label htmlFor="so-pass">New password</label>
+                      <input
+                        id="so-pass"
+                        type="password"
+                        required
+                        minLength={8}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                      />
+                    </div>
+                    <div className="yulo-login__field">
+                      <label htmlFor="so-pass2">Confirm password</label>
+                      <input
+                        id="so-pass2"
+                        type="password"
+                        required
+                        minLength={8}
+                        value={passwordConfirmation}
+                        onChange={(e) => setPasswordConfirmation(e.target.value)}
+                      />
+                    </div>
+                    <button type="submit" className="yulo-login__btn" disabled={busy}>
+                      {busy ? <span className="spinner-border spinner-border-sm" /> : 'Submit for approval'}
+                    </button>
+                  </form>
+                )}
+              </>
+            )}
+          </motion.div>
         </div>
       </div>
     </>

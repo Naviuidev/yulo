@@ -440,6 +440,7 @@ body {
   background: #0a0a0a;
   min-height: 100vh;
   min-height: 100dvh;
+  overflow-y: auto;
 }
 
 .yulo-login-page__content {
@@ -1812,4 +1813,135 @@ body {
 .yulo-licence-feature input {
   margin: 0;
 }
+
+.yulo-licence-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.85rem;
+}
+
+.yulo-licence-user-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e8e8e8;
+  background: #fff;
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.yulo-licence-user-card:hover {
+  border-color: #111;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.yulo-licence-user-card__avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: #111;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.yulo-licence-user-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.yulo-licence-user-card__body strong {
+  font-size: 0.9375rem;
+  color: #111;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.yulo-licence-user-card__body em {
+  font-style: normal;
+  font-size: 0.75rem;
+  color: #777;
+  text-transform: capitalize;
+}
+
+.yulo-licence-user-card .bi-chevron-right {
+  color: #bbb;
+  font-size: 0.9rem;
+}
+
+.yulo-licence-table th {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #777;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.yulo-licence-table td {
+  font-size: 0.875rem;
+  vertical-align: middle;
+}
+
+.yulo-licence-table__features {
+  max-width: 280px;
+  line-height: 1.4;
+}
+
+.yulo-licence-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: #f3f3f3;
+  color: #333;
+  white-space: nowrap;
+}
+
+.yulo-licence-status--approved {
+  background: #e8f5e9;
+  color: #1b5e20;
+}
+
+.yulo-licence-status--pending_approval,
+.yulo-licence-status--invite_sent {
+  background: #fff8e1;
+  color: #8a6d00;
+}
+
+.yulo-licence-status--banned,
+.yulo-licence-status--rejected {
+  background: #fdecea;
+  color: #b71c1c;
+}
+
+.yulo-licence-settings-btn {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.yulo-licence-settings-btn .bi {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
 

@@ -98,4 +98,34 @@ final class User
         $stmt = $this->db->prepare('UPDATE refresh_tokens SET revoked_at = NOW() WHERE token = :token');
         $stmt->execute(['token' => hash('sha256', $token)]);
     }
+
+    /**
+     * Revoke staff admin access so the email can be re-licensed.
+     * Demotes to customer instead of hard-deleting (orders/addresses FKs).
+     */
+    public function deleteStaffAccount(int $id): bool
+    {
+        $user = $this->findById($id);
+        if (!$user || ($user['role'] ?? '') !== 'staff') {
+            return false;
+        }
+
+        $this->db->prepare('DELETE FROM refresh_tokens WHERE user_id = :id')->execute(['id' => $id]);
+
+        try {
+            $this->db->prepare('DELETE FROM admin_notification_reads WHERE user_id = :id')->execute(['id' => $id]);
+        } catch (Throwable) {
+            // table may not exist on older DBs
+        }
+
+        $this->db->prepare(
+            'UPDATE admin_staff_licences SET user_id = NULL WHERE user_id = :id'
+        )->execute(['id' => $id]);
+
+        return $this->update($id, [
+            'role' => 'customer',
+            'permissions' => null,
+            'status' => 'active',
+        ]);
+    }
 }

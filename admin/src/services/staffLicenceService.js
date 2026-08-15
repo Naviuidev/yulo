@@ -9,8 +9,15 @@ const staffLicenceService = {
     extractData(await api.post(`/admin/staff-licences/${id}/verify-dev-otp`, { otp })),
   assignFeatures: async (id, features) =>
     extractData(await api.post(`/admin/staff-licences/${id}/features`, { features })),
+  updateFeatures: async (id, features) =>
+    extractData(await api.patch(`/admin/staff-licences/${id}/features`, { features })),
+  sendInvite: async (id, tempPassword) =>
+    extractData(await api.post(`/admin/staff-licences/${id}/send-invite`, { temp_password: tempPassword })),
   approve: async (id) => extractData(await api.post(`/admin/staff-licences/${id}/approve`)),
   reject: async (id) => extractData(await api.post(`/admin/staff-licences/${id}/reject`)),
+  ban: async (id) => extractData(await api.post(`/admin/staff-licences/${id}/ban`)),
+  unban: async (id) => extractData(await api.post(`/admin/staff-licences/${id}/unban`)),
+  remove: async (id) => extractData(await api.delete(`/admin/staff-licences/${id}`)),
 };
 
 export const staffOnboardService = {

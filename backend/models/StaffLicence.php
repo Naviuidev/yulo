@@ -50,6 +50,28 @@ final class StaffLicence
         return $row ? $this->hydrate($row) : null;
     }
 
+    /** Any non-finished licence that should block issuing a new one for this email. */
+    public function findBlockingByEmail(string $email): ?array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT * FROM admin_staff_licences
+             WHERE staff_email = :email
+               AND status IN (
+                 'awaiting_dev_otp',
+                 'features_pending',
+                 'invite_sent',
+                 'pending_approval',
+                 'approved',
+                 'banned'
+               )
+             ORDER BY id DESC
+             LIMIT 1"
+        );
+        $stmt->execute(['email' => strtolower(trim($email))]);
+        $row = $stmt->fetch();
+        return $row ? $this->hydrate($row) : null;
+    }
+
     public function listByStatuses(array $statuses): array
     {
         if ($statuses === []) {
@@ -67,6 +89,18 @@ final class StaffLicence
             "SELECT * FROM admin_staff_licences WHERE status IN ({$in}) ORDER BY updated_at DESC"
         );
         $stmt->execute($bind);
+        return array_map([$this, 'hydrate'], $stmt->fetchAll());
+    }
+
+    /** All licences except permanently deleted ones. */
+    public function listExceptDeleted(): array
+    {
+        $stmt = $this->db->prepare(
+            "SELECT * FROM admin_staff_licences
+             WHERE status <> 'deleted'
+             ORDER BY updated_at DESC, id DESC"
+        );
+        $stmt->execute();
         return array_map([$this, 'hydrate'], $stmt->fetchAll());
     }
 
@@ -110,6 +144,12 @@ final class StaffLicence
         $fields[] = 'updated_at = NOW()';
         $stmt = $this->db->prepare('UPDATE admin_staff_licences SET ' . implode(', ', $fields) . ' WHERE id = :id');
         return $stmt->execute($params);
+    }
+
+    public function delete(int $id): bool
+    {
+        $stmt = $this->db->prepare('DELETE FROM admin_staff_licences WHERE id = :id');
+        return $stmt->execute(['id' => $id]);
     }
 
     private function hydrate(array $row): array

@@ -44,14 +44,7 @@ final class StaffLicenceAdminController extends BaseController
     public function index(array $params = []): void
     {
         $this->requireMaster();
-        Response::jsonSuccess($this->licences->listByStatuses([
-            'awaiting_dev_otp',
-            'features_pending',
-            'invite_sent',
-            'pending_approval',
-            'approved',
-            'rejected',
-        ]));
+        Response::jsonSuccess($this->licences->listExceptDeleted());
     }
 
     /** Step 1: staff email → OTP to developer inbox */
@@ -67,9 +60,26 @@ final class StaffLicenceAdminController extends BaseController
         $email = strtolower(trim((string) $input['email']));
         $name = trim((string) ($input['name'] ?? ''));
 
+        $blockingLicence = $this->licences->findBlockingByEmail($email);
+        if ($blockingLicence) {
+            Response::jsonError(
+                $blockingLicence['status'] === 'banned'
+                    ? 'This email is banned. Unban or delete the licence first.'
+                    : 'This email already has an admin account.',
+                422
+            );
+        }
+
         $existing = $this->users->findByEmail($email);
-        if ($existing && in_array($existing['role'], ['admin', 'super_admin', 'staff'], true)) {
-            Response::jsonError('This email already has an admin account.', 422);
+        if ($existing) {
+            $role = $existing['role'] ?? '';
+            if (in_array($role, ['admin', 'super_admin'], true)) {
+                Response::jsonError('This email already has an admin account.', 422);
+            }
+            // Orphan staff left after a prior delete — remove so email can be re-licensed
+            if ($role === 'staff') {
+                $this->users->deleteStaffAccount((int) $existing['id']);
+            }
         }
 
         $otp = (string) random_int(100000, 999999);
@@ -143,7 +153,7 @@ final class StaffLicenceAdminController extends BaseController
         ], 'OTP verified.');
     }
 
-    /** Step 3–4: save features, generate temp password, email member */
+    /** Step 3–4: save features + temp password (email sent only via sendInvite) */
     public function assignFeatures(array $params): void
     {
         $this->requireMaster();
@@ -177,6 +187,117 @@ final class StaffLicenceAdminController extends BaseController
             'member_otp_verified_at' => null,
         ]);
 
+        Response::jsonSuccess([
+            'licence_id' => (int) $raw['id'],
+            'staff_email' => $raw['staff_email'],
+            'staff_name' => $raw['staff_name'],
+            'invite_url' => $inviteUrl,
+            'temp_password' => $tempPassword,
+            'features' => $features,
+            'email_sent' => false,
+        ], 'Invite ready. Click Processed Licence to email the member.');
+    }
+
+    /** Update features for an approved staff licence */
+    public function updateFeatures(array $params): void
+    {
+        $this->requireMaster();
+        $input = $this->getJsonInput();
+        $features = $input['features'] ?? [];
+        if (!is_array($features) || $features === []) {
+            Response::jsonError('Select at least one feature.', 422);
+        }
+
+        $allowed = StaffLicence::featureKeys();
+        $features = array_values(array_unique(array_filter($features, static fn($k) => in_array($k, $allowed, true))));
+        if ($features === []) {
+            Response::jsonError('Select at least one valid feature.', 422);
+        }
+
+        sort($features);
+
+        $raw = $this->licences->findRawById((int) $params['id']);
+        if (!$raw || ($raw['status'] ?? '') !== 'approved') {
+            Response::jsonError('Only approved licences can update features.', 422);
+        }
+
+        $previous = is_array($raw['features'] ?? null) ? array_values($raw['features']) : [];
+        $previous = array_values(array_unique(array_filter($previous, static fn($k) => in_array($k, $allowed, true))));
+        sort($previous);
+
+        if ($previous === $features) {
+            Response::jsonSuccess(
+                $this->licences->findById((int) $raw['id']),
+                'No feature changes to save.'
+            );
+        }
+
+        $added = array_values(array_diff($features, $previous));
+        $removed = array_values(array_diff($previous, $features));
+
+        $this->licences->update((int) $raw['id'], [
+            'features' => $features,
+        ]);
+
+        if (!empty($raw['user_id'])) {
+            $this->users->update((int) $raw['user_id'], [
+                'permissions' => json_encode($features),
+            ]);
+        }
+
+        $name = trim((string) ($raw['staff_name'] ?? ''));
+        if ($name === '') {
+            $name = explode('@', (string) $raw['staff_email'])[0] ?: 'there';
+        }
+
+        $adminUrl = rtrim((string) ($this->app['admin_url'] ?? 'http://localhost:5174'), '/');
+        $loginUrl = $adminUrl . '/login?fresh=1';
+
+        $addedHtml = $this->featureListHtml($added);
+        $removedHtml = $this->featureListHtml($removed);
+        $currentHtml = $this->featureListHtml($features);
+
+        $sent = $this->mailer->send(
+            (string) $raw['staff_email'],
+            'YULO Admin access updated',
+            '<p>Hi ' . htmlspecialchars($name) . ',</p>'
+            . '<p>Your YULO Admin access was updated by a master admin.</p>'
+            . '<p><strong>Added:</strong></p>' . $addedHtml
+            . '<p><strong>Removed:</strong></p>' . $removedHtml
+            . '<p><strong>Current access:</strong></p>' . $currentHtml
+            . '<p>Login here: <a href="' . htmlspecialchars($loginUrl) . '">' . htmlspecialchars($loginUrl) . '</a></p>'
+            . '<p>Sign in with your email and password to see the updated menu.</p>'
+        );
+
+        Response::jsonSuccess(
+            [
+                ...($this->licences->findById((int) $raw['id']) ?? []),
+                'email_sent' => $sent,
+                'added' => $added,
+                'removed' => $removed,
+            ],
+            $sent ? 'Features updated and member notified by email.' : 'Features updated (email could not be sent).'
+        );
+    }
+
+    /** Step 4: send invite email after master confirms Processed Licence */
+    public function sendInvite(array $params): void
+    {
+        $this->requireMaster();
+        $input = $this->getJsonInput();
+        $tempPassword = trim((string) ($input['temp_password'] ?? ''));
+
+        $raw = $this->licences->findRawById((int) $params['id']);
+        if (!$raw || $raw['status'] !== 'invite_sent') {
+            Response::jsonError('Licence is not ready to email.', 422);
+        }
+
+        if ($tempPassword === '' || empty($raw['temp_password_hash'])
+            || !Security::verifyPassword($tempPassword, (string) $raw['temp_password_hash'])) {
+            Response::jsonError('Temporary password does not match this invite.', 422);
+        }
+
+        $features = is_array($raw['features'] ?? null) ? $raw['features'] : [];
         $featureLabels = [];
         foreach (StaffLicence::FEATURES as $f) {
             if (in_array($f['key'], $features, true)) {
@@ -184,7 +305,10 @@ final class StaffLicenceAdminController extends BaseController
             }
         }
 
+        $adminUrl = rtrim((string) ($this->app['admin_url'] ?? 'http://localhost:5174'), '/');
+        $inviteUrl = $adminUrl . '/staff-onboard/' . $raw['invite_token'];
         $email = $raw['staff_email'];
+
         $sent = $this->mailer->send(
             $email,
             'YULO Admin access invite',
@@ -196,14 +320,97 @@ final class StaffLicenceAdminController extends BaseController
             . '<p>After you set your password, a master admin must approve your access.</p>'
         );
 
+        if (!$sent) {
+            Response::jsonError('Could not send invite email. Check mail settings.', 500);
+        }
+
         Response::jsonSuccess([
             'licence_id' => (int) $raw['id'],
             'staff_email' => $email,
-            'invite_url' => $inviteUrl,
-            'temp_password' => $tempPassword,
-            'features' => $features,
-            'email_sent' => $sent,
-        ], $sent ? 'Invite sent to staff email.' : 'Temp password generated (email may have failed — share manually).');
+            'email_sent' => true,
+        ], 'Invite emailed to staff.');
+    }
+
+    public function ban(array $params): void
+    {
+        $this->requireMaster();
+        $raw = $this->licences->findRawById((int) $params['id']);
+        if (!$raw) {
+            Response::jsonError('Licence not found.', 404);
+        }
+        if (!in_array($raw['status'], ['approved', 'pending_approval', 'invite_sent'], true)) {
+            Response::jsonError('This licence cannot be banned.', 422);
+        }
+
+        if (!empty($raw['user_id'])) {
+            $this->users->update((int) $raw['user_id'], ['status' => 'inactive']);
+        }
+
+        $this->licences->update((int) $raw['id'], [
+            'status' => 'banned',
+            'reviewed_by' => $this->authUserId(),
+            'reviewed_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        Response::jsonSuccess($this->licences->findById((int) $raw['id']), 'Licence banned.');
+    }
+
+    public function unban(array $params): void
+    {
+        $this->requireMaster();
+        $raw = $this->licences->findRawById((int) $params['id']);
+        if (!$raw || $raw['status'] !== 'banned') {
+            Response::jsonError('Licence is not banned.', 422);
+        }
+
+        $nextStatus = !empty($raw['user_id']) ? 'approved' : 'invite_sent';
+        if (!empty($raw['user_id'])) {
+            $this->users->update((int) $raw['user_id'], [
+                'status' => 'active',
+                'permissions' => json_encode($raw['features'] ?? []),
+            ]);
+        }
+
+        $this->licences->update((int) $raw['id'], [
+            'status' => $nextStatus,
+            'reviewed_by' => $this->authUserId(),
+            'reviewed_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        Response::jsonSuccess($this->licences->findById((int) $raw['id']), 'Licence restored.');
+    }
+
+    public function destroy(array $params): void
+    {
+        $this->requireMaster();
+        $raw = $this->licences->findRawById((int) $params['id']);
+        if (!$raw) {
+            Response::jsonError('Licence not found.', 404);
+        }
+
+        $staffUserId = !empty($raw['user_id']) ? (int) $raw['user_id'] : null;
+        if (!$staffUserId) {
+            $byEmail = $this->users->findByEmail((string) $raw['staff_email']);
+            if ($byEmail && ($byEmail['role'] ?? '') === 'staff') {
+                $staffUserId = (int) $byEmail['id'];
+            }
+        }
+
+        $this->licences->update((int) $raw['id'], [
+            'status' => 'deleted',
+            'user_id' => null,
+            'temp_password_hash' => null,
+            'developer_otp_hash' => null,
+            'member_otp_hash' => null,
+            'reviewed_by' => $this->authUserId(),
+            'reviewed_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        if ($staffUserId) {
+            $this->users->deleteStaffAccount($staffUserId);
+        }
+
+        Response::jsonSuccess(null, 'Licence deleted.');
     }
 
     public function approve(array $params): void
@@ -228,7 +435,7 @@ final class StaffLicenceAdminController extends BaseController
 
         $user = $this->users->findById((int) $raw['user_id']);
         $adminUrl = rtrim((string) ($this->app['admin_url'] ?? 'http://localhost:5174'), '/');
-        $loginUrl = $adminUrl . '/login';
+        $loginUrl = $adminUrl . '/login?fresh=1';
 
         if ($user) {
             $this->mailer->send(
@@ -269,6 +476,27 @@ final class StaffLicenceAdminController extends BaseController
     {
         $chunk = static fn () => strtoupper(substr(bin2hex(random_bytes(3)), 0, 4));
         return 'Yulo-' . $chunk() . '-' . $chunk();
+    }
+
+    /** @param list<string> $keys */
+    private function featureListHtml(array $keys): string
+    {
+        if ($keys === []) {
+            return '<p><em>None</em></p>';
+        }
+
+        $labels = [];
+        foreach (StaffLicence::FEATURES as $f) {
+            if (in_array($f['key'], $keys, true)) {
+                $labels[] = $f['label'];
+            }
+        }
+
+        if ($labels === []) {
+            return '<p><em>None</em></p>';
+        }
+
+        return '<ul><li>' . implode('</li><li>', array_map('htmlspecialchars', $labels)) . '</li></ul>';
     }
 
     private function maskEmail(string $email): string

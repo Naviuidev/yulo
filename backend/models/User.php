@@ -6,12 +6,14 @@ final class User
 {
     public function __construct(private PDO $db)
     {
+        SchemaGuard::ensureMarketingOptIn($this->db);
     }
 
     public function findById(int $id): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, name, email, phone, role, permissions, status, email_verified_at, created_at
+            'SELECT id, name, email, phone, role, permissions, status, marketing_opt_in,
+                    email_verified_at, created_at
              FROM users WHERE id = :id LIMIT 1'
         );
         $stmt->execute(['id' => $id]);
@@ -23,6 +25,7 @@ final class User
             $decoded = json_decode($user['permissions'], true);
             $user['permissions'] = is_array($decoded) ? $decoded : null;
         }
+        $user['marketing_opt_in'] = (int) ($user['marketing_opt_in'] ?? 1) === 1;
         return $user;
     }
 
@@ -37,8 +40,8 @@ final class User
     public function create(array $data): int
     {
         $stmt = $this->db->prepare(
-            'INSERT INTO users (name, email, password, phone, role, status, created_at, updated_at)
-             VALUES (:name, :email, :password, :phone, :role, :status, NOW(), NOW())'
+            'INSERT INTO users (name, email, password, phone, role, status, marketing_opt_in, created_at, updated_at)
+             VALUES (:name, :email, :password, :phone, :role, :status, :marketing_opt_in, NOW(), NOW())'
         );
         $stmt->execute([
             'name' => $data['name'],
@@ -47,6 +50,7 @@ final class User
             'phone' => $data['phone'] ?? null,
             'role' => $data['role'] ?? 'customer',
             'status' => $data['status'] ?? 'active',
+            'marketing_opt_in' => isset($data['marketing_opt_in']) ? ((int) !empty($data['marketing_opt_in'])) : 1,
         ]);
         return (int) $this->db->lastInsertId();
     }

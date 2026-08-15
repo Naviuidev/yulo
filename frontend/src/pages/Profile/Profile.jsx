@@ -30,6 +30,7 @@ const SECTIONS = [
   { id: 'personal', label: 'Personal Information', icon: 'bi-person' },
   { id: 'addresses', label: 'Saved Addresses', icon: 'bi-geo-alt' },
   { id: 'orders', label: 'Orders', icon: 'bi-bag' },
+  { id: 'permissions', label: 'Permissions', icon: 'bi-shield-check' },
 ];
 
 const STATUS_COLORS = {
@@ -74,7 +75,10 @@ export default function Profile() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersLoaded, setOrdersLoaded] = useState(false);
   const [addressMode, setAddressMode] = useState(null);
+  const [savingOptIn, setSavingOptIn] = useState(false);
   const { register, handleSubmit, reset } = useForm();
+
+  const marketingOptIn = Boolean(user?.marketing_opt_in ?? true);
 
   const editingAddress = useMemo(() => {
     if (!addressMode || addressMode === 'new') return null;
@@ -130,10 +134,15 @@ export default function Profile() {
           loadAddresses(),
         ]);
         if (cancelled) return;
-        if (profileRes?.data?.data) {
-          reset(profileRes.data.data);
+        const profileUser = profileRes?.data?.data?.user ?? profileRes?.data?.data;
+        if (profileUser?.email || profileUser?.name) {
+          reset({
+            name: profileUser.name || '',
+            email: profileUser.email || '',
+            phone: profileUser.phone || '',
+          });
         } else if (user) {
-          reset({ name: user.name, email: user.email, phone: user.phone });
+          reset({ name: user.name || '', email: user.email || '', phone: user.phone || '' });
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -201,6 +210,20 @@ export default function Profile() {
     }
   };
 
+  const onToggleMarketingOptIn = async () => {
+    const next = !marketingOptIn;
+    setSavingOptIn(true);
+    try {
+      await profileService.updateProfile({ marketing_opt_in: next });
+      await refreshUser?.();
+      toast.success(next ? 'Opted in to promotions' : 'Opted out of promotional emails');
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? 'Could not update preference');
+    } finally {
+      setSavingOptIn(false);
+    }
+  };
+
   if (loading) return <Loader fullScreen />;
 
   return (
@@ -243,7 +266,15 @@ export default function Profile() {
                   </div>
                   <div className="mb-3">
                     <label className="form-label">Email</label>
-                    <input type="email" className="form-control" {...register('email')} disabled />
+                    <input
+                      type="email"
+                      className="form-control"
+                      value={user?.email || ''}
+                      placeholder={user?.email || 'Your email'}
+                      readOnly
+                      disabled
+                      aria-readonly="true"
+                    />
                   </div>
                   <div className="mb-4">
                     <label className="form-label">Phone</label>
@@ -434,6 +465,46 @@ export default function Profile() {
                     ))}
                   </div>
                 )}
+              </section>
+            )}
+
+            {activeSection === 'permissions' && (
+              <section>
+                <h2 className="h5 text-uppercase small fw-semibold mb-3">Permissions</h2>
+                <p className="text-muted mb-4" style={{ maxWidth: 560 }}>
+                  Control whether YULO can email you promotions, offers, and campaign updates.
+                  Your account, orders, and order notifications are never affected by this setting.
+                </p>
+
+                <div className="profile-permission-card">
+                  <div className="profile-permission-card__copy">
+                    <h3 className="h6 mb-2">Promotional emails</h3>
+                    <p className="small text-muted mb-2">
+                      <strong>Opt in</strong> means you allow YULO to send product launches, discounts,
+                      and campaign emails to your registered address.
+                    </p>
+                    <p className="small text-muted mb-0">
+                      <strong>Opt out</strong> means you will not receive marketing or campaign emails.
+                      You can still use the store, place orders, and get order-related updates.
+                    </p>
+                  </div>
+                  <div className="profile-permission-card__toggle">
+                    <span className="small text-uppercase fw-semibold">
+                      {marketingOptIn ? 'Opted in' : 'Opted out'}
+                    </span>
+                    <button
+                      type="button"
+                      className={`profile-opt-toggle ${marketingOptIn ? 'is-on' : ''}`}
+                      role="switch"
+                      aria-checked={marketingOptIn}
+                      aria-label="Toggle promotional email opt-in"
+                      disabled={savingOptIn}
+                      onClick={onToggleMarketingOptIn}
+                    >
+                      <span className="profile-opt-toggle__knob" />
+                    </button>
+                  </div>
+                </div>
               </section>
             )}
           </div>

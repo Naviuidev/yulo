@@ -236,6 +236,56 @@ final class SchemaGuard
         $ready = true;
     }
 
+    /** users.marketing_opt_in — default opted-in for promotions. */
+    public static function ensureMarketingOptIn(PDO $db): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+
+        self::ensureColumn(
+            $db,
+            'users',
+            'marketing_opt_in',
+            'TINYINT(1) NOT NULL DEFAULT 1'
+        );
+
+        $ready = true;
+    }
+
+    /** Log of triggered digital marketing promotion campaigns. */
+    public static function ensureMarketingCampaigns(PDO $db): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+
+        $db->exec(
+            "CREATE TABLE IF NOT EXISTS marketing_campaigns (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                heading VARCHAR(255) NOT NULL,
+                description TEXT NULL,
+                banner_image VARCHAR(500) NULL,
+                product_link VARCHAR(500) NULL,
+                actual_price VARCHAR(50) NULL,
+                offer_price VARCHAR(50) NULL,
+                mode ENUM('one_to_one', 'bulk') NOT NULL DEFAULT 'one_to_one',
+                audience_type ENUM('users', 'customers', 'subscribed') NOT NULL DEFAULT 'users',
+                recipient_count INT UNSIGNED NOT NULL DEFAULT 0,
+                sent_count INT UNSIGNED NOT NULL DEFAULT 0,
+                failed_count INT UNSIGNED NOT NULL DEFAULT 0,
+                status ENUM('sent', 'partial', 'failed') NOT NULL DEFAULT 'sent',
+                triggered_by INT UNSIGNED NULL,
+                created_at DATETIME NOT NULL,
+                INDEX idx_marketing_campaigns_created (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+
+        $ready = true;
+    }
+
     /** Review display name + optional avatar for testimonials / moderation. */
     public static function ensureReviewExtras(PDO $db): void
     {

@@ -10,12 +10,21 @@ final class CustomerAdminController extends BaseController
     {
         $pagination = Pagination::resolve();
         $search = $_GET['search'] ?? '';
+        // customers = placed ≥1 order; signup = all registered storefront accounts (customer + staff)
+        $type = trim((string) ($_GET['type'] ?? 'customers'));
+        if (!in_array($type, ['customers', 'signup'], true)) {
+            $type = 'customers';
+        }
 
-        $where = "u.role = 'customer'";
+        $where = "u.role IN ('customer', 'staff')";
         $bind = [];
 
+        if ($type === 'customers') {
+            $where .= ' AND EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)';
+        }
+
         if ($search) {
-            $where .= ' AND (u.name LIKE :search OR u.email LIKE :search)';
+            $where .= ' AND (u.name LIKE :search OR u.email LIKE :search OR u.phone LIKE :search)';
             $bind['search'] = '%' . $search . '%';
         }
 
@@ -24,7 +33,7 @@ final class CustomerAdminController extends BaseController
         $total = (int) $countStmt->fetchColumn();
 
         $stmt = $this->db->prepare(
-            "SELECT u.id, u.name, u.email, u.phone, u.status, u.created_at,
+            "SELECT u.id, u.name, u.email, u.phone, u.role, u.status, u.created_at,
                     (SELECT COUNT(*) FROM orders WHERE user_id = u.id) as order_count,
                     (SELECT COALESCE(SUM(total), 0) FROM orders WHERE user_id = u.id AND payment_status = 'paid') as total_spent
              FROM users u WHERE {$where} ORDER BY u.created_at DESC LIMIT :limit OFFSET :offset"
@@ -44,7 +53,7 @@ final class CustomerAdminController extends BaseController
         $userModel = new User($this->db);
         $user = $userModel->findById((int) $params['id']);
 
-        if (!$user || $user['role'] !== 'customer') {
+        if (!$user || !in_array($user['role'] ?? '', ['customer', 'staff'], true)) {
             Response::jsonError('Customer not found.', 404);
         }
 

@@ -23,6 +23,11 @@ export const ORDER_STATUS_LABELS = {
   returned: 'Returned',
   refunded: 'Refunded',
   shared_response: 'Shared response',
+  opted_in: 'Opted in',
+  opted_out: 'Opted out',
+  sent: 'Sent',
+  partial: 'Partial',
+  failed: 'Failed',
 };
 
 export const STATUS_BADGE_MAP = {
@@ -50,6 +55,10 @@ export const STATUS_BADGE_MAP = {
   read: 'light',
   replied: 'dark',
   in_transit: 'dark',
+  opted_in: 'dark',
+  opted_out: 'light',
+  sent: 'dark',
+  partial: 'light',
 };
 
 export const NAV_ITEMS = [
@@ -69,6 +78,8 @@ export const NAV_ITEMS = [
   { path: '/visitors', icon: 'bi-eye', label: 'Visitors', feature: 'visitors' },
   { path: '/payments', icon: 'bi-credit-card', label: 'Payments', feature: 'payments' },
   { path: '/social-connects', icon: 'bi-share', label: 'Configure Social Connects', feature: 'social-connects' },
+  { path: '/marketing', icon: 'bi-broadcast', label: 'Marketing', feature: 'marketing', masterOnly: true },
+  { path: '/marketing-free', icon: 'bi-broadcast-pin', label: 'Marketing', feature: 'marketing-free', masterOnly: true, badge: 'Paid' },
   { path: '/admin-config', icon: 'bi-shield-lock', label: 'Admin Config', feature: 'admin-config', masterOnly: true },
   { path: '/doc', icon: 'bi-book', label: 'Doc', feature: 'doc' },
 ];
@@ -84,7 +95,7 @@ export function canAccessFeature(user, featureKey) {
   if (!user) return false;
   if (isMasterAdmin(user)) return true;
   if (user.role !== 'staff') return false;
-  if (featureKey === 'admin-config') return false;
+  if (featureKey === 'admin-config' || featureKey === 'marketing' || featureKey === 'marketing-free') return false;
   const perms = Array.isArray(user.permissions) ? user.permissions : [];
   return perms.includes(featureKey);
 }

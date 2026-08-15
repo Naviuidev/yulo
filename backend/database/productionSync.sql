@@ -5,7 +5,7 @@
 --   1. Select the production database on the left
 --   2. Import this file  OR  SQL tab → paste → Go
 --
--- For THIS release delta only (staff licence banned/deleted), prefer the smaller:
+-- For THIS release delta only (marketing campaigns + opt-in), prefer the smaller:
 --   backend/database/productionReady.sql
 --
 -- Covers feature tables / columns added after the original schema:
@@ -17,6 +17,7 @@
 --   • orders.payment_method cashfree + email_notified_at
 --   • reviews.display_name / avatar_path
 --   • favicon settings keys
+--   • marketing_campaigns + users.marketing_opt_in   ← NEW vs last deploy
 --
 -- Does NOT drop data. Does NOT truncate tables.
 -- =============================================================================
@@ -430,6 +431,38 @@ ON DUPLICATE KEY UPDATE
 UPDATE settings SET is_public = 0, `group` = 'branding' WHERE `key` = 'favicon_url';
 UPDATE settings SET is_public = 1, `group` = 'branding' WHERE `key` = 'favicon_published';
 
+-- ---------------------------------------------------------------------------
+-- A9) Marketing campaigns (digital marketing send log)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS marketing_campaigns (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    heading VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    banner_image VARCHAR(500) NULL,
+    product_link VARCHAR(500) NULL,
+    actual_price VARCHAR(50) NULL,
+    offer_price VARCHAR(50) NULL,
+    mode ENUM('one_to_one', 'bulk') NOT NULL DEFAULT 'one_to_one',
+    audience_type ENUM('users', 'customers', 'subscribed') NOT NULL DEFAULT 'users',
+    recipient_count INT UNSIGNED NOT NULL DEFAULT 0,
+    sent_count INT UNSIGNED NOT NULL DEFAULT 0,
+    failed_count INT UNSIGNED NOT NULL DEFAULT 0,
+    status ENUM('sent', 'partial', 'failed') NOT NULL DEFAULT 'sent',
+    triggered_by INT UNSIGNED NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_marketing_campaigns_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- B9) users.marketing_opt_in
+SET @sql := (
+  SELECT IF(
+    EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=@db AND TABLE_NAME='users' AND COLUMN_NAME='marketing_opt_in'),
+    'SELECT ''users.marketing_opt_in already exists'' AS info',
+    'ALTER TABLE users ADD COLUMN marketing_opt_in TINYINT(1) NOT NULL DEFAULT 1'
+  )
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- ###########################################################################
 -- Master admin login → User ID 992201351702 / Password Hosur@1998
 -- ###########################################################################
@@ -457,7 +490,9 @@ WHERE id = (
 --   SHOW TABLES LIKE 'visitor_page_views';
 --   SHOW TABLES LIKE 'admin_notification_reads';
 --   SHOW TABLES LIKE 'admin_staff_licences';
+--   SHOW TABLES LIKE 'marketing_campaigns';
 --   SHOW COLUMNS FROM users LIKE 'permissions';
+--   SHOW COLUMNS FROM users LIKE 'marketing_opt_in';
 --   SHOW COLUMNS FROM products LIKE 'gst_applicable';
 --   SELECT `key`, `group`, is_public FROM settings
 --     WHERE `key` IN ('favicon_url','favicon_published');

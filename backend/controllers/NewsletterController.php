@@ -23,7 +23,7 @@ final class NewsletterController extends BaseController
         );
         $stmt->execute(['email' => $email, 'status' => 'active', 'status_update' => 'active']);
 
-        Response::jsonSuccess(null, 'Subscribed to newsletter.', 201);
+        Response::jsonSuccess(null, 'Thanks for the subscription. You will receive the latest news and campaigns via email.', 201);
     }
 
     public function unsubscribe(array $params = []): void

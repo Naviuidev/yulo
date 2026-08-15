@@ -21,8 +21,9 @@ final class AuthMiddleware
         }
 
         $pdo = Database::getInstance();
+        SchemaGuard::ensureMarketingOptIn($pdo);
         $stmt = $pdo->prepare(
-            'SELECT id, name, email, phone, role, permissions, status, email_verified_at
+            'SELECT id, name, email, phone, role, permissions, status, marketing_opt_in, email_verified_at
              FROM users WHERE id = :id AND status = :status LIMIT 1'
         );
         $stmt->execute(['id' => $payload['sub'], 'status' => 'active']);
@@ -37,6 +38,7 @@ final class AuthMiddleware
             $decoded = json_decode($user['permissions'], true);
             $user['permissions'] = is_array($decoded) ? $decoded : null;
         }
+        $user['marketing_opt_in'] = (int) ($user['marketing_opt_in'] ?? 1) === 1;
 
         $GLOBALS['auth_user'] = $user;
         $GLOBALS['auth_payload'] = $payload;

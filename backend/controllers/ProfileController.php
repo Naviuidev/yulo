@@ -40,6 +40,9 @@ final class ProfileController extends BaseController
         if (isset($input['phone'])) {
             $data['phone'] = $input['phone'];
         }
+        if (array_key_exists('marketing_opt_in', $input)) {
+            $data['marketing_opt_in'] = !empty($input['marketing_opt_in']) ? 1 : 0;
+        }
 
         if (!empty($input['password'])) {
             $validator = Validator::make($input)->required('current_password')->min('password', 8)->confirmed('password');

@@ -526,11 +526,23 @@
   text-align: center;
 }
 
+.newsletter-section form {
+  width: 100%;
+  max-width: 400px;
+  margin-inline: auto;
+}
+
 .newsletter-section .form-control {
+  width: 100%;
+  max-width: none;
   border-radius: 0;
   border: 1px solid var(--border);
   padding: 0.875rem 1.25rem;
-  max-width: 400px;
+}
+
+.newsletter-section .newsletter-form__btn,
+.newsletter-section .btn-yulo {
+  width: 100%;
 }
 
 /* FAQ Accordion */
@@ -578,7 +590,34 @@
 
 @media (max-width: 575px) {
   .hero-banner {
-    min-height: 80vh;
+    /* Fit the visible area above the fixed bottom nav (100vh alone overlaps it) */
+    min-height: calc(
+      100dvh - var(--announcement-height) - var(--navbar-height) - var(--bottom-nav-height) -
+        env(safe-area-inset-bottom, 0px)
+    );
+    min-height: calc(
+      100svh - var(--announcement-height) - var(--navbar-height) - var(--bottom-nav-height) -
+        env(safe-area-inset-bottom, 0px)
+    );
+    align-items: center;
+  }
+
+  .hero-banner__content {
+    padding: 1.75rem 1.25rem 1.5rem;
+    width: 100%;
+  }
+
+  .hero-banner__tagline {
+    margin-bottom: 1.25rem;
+    font-size: clamp(1.45rem, 6.5vw, 1.85rem);
+  }
+
+  .hero-banner__gold-line {
+    margin-bottom: 1.5rem;
+  }
+
+  .hero-banner__cta {
+    gap: 0.75rem;
   }
 
   .category-slider {
@@ -592,5 +631,18 @@
 
   .instagram-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 576px) and (max-width: 991.98px) {
+  .hero-banner {
+    min-height: calc(
+      100dvh - var(--announcement-height) - var(--navbar-height) - var(--bottom-nav-height) -
+        env(safe-area-inset-bottom, 0px)
+    );
+    min-height: calc(
+      100svh - var(--announcement-height) - var(--navbar-height) - var(--bottom-nav-height) -
+        env(safe-area-inset-bottom, 0px)
+    );
   }
 }

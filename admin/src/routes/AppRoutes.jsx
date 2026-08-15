@@ -24,6 +24,8 @@ import Notifications from '../pages/Notifications/Notifications';
 import Visitors from '../pages/Visitors/Visitors';
 import Doc from '../pages/Doc/Doc';
 import AdminConfig from '../pages/AdminConfig/AdminConfig';
+import Marketing from '../pages/Marketing/Marketing';
+import MarketingFree from '../pages/Marketing/MarketingFree';
 import StaffOnboard from '../pages/StaffOnboard/StaffOnboard';
 import { useAuth } from '../context/AuthContext';
 import { canAccessFeature, isMasterAdmin, navItemsForUser } from '../utils/constants';
@@ -36,7 +38,9 @@ function FeatureRoute({ feature, children }) {
   if (!user) return <Navigate to="/login" replace />;
 
   const allowed =
-    feature === 'admin-config' ? isMasterAdmin(user) : canAccessFeature(user, feature);
+    feature === 'admin-config' || feature === 'marketing' || feature === 'marketing-free'
+      ? isMasterAdmin(user)
+      : canAccessFeature(user, feature);
 
   if (!allowed) {
     const fallback = navItemsForUser(user)[0]?.path || '/login';
@@ -223,6 +227,22 @@ const AppRoutes = () => (
         element={
           <FeatureRoute feature="visitors">
             <Visitors />
+          </FeatureRoute>
+        }
+      />
+      <Route
+        path="marketing"
+        element={
+          <FeatureRoute feature="marketing">
+            <Marketing />
+          </FeatureRoute>
+        }
+      />
+      <Route
+        path="marketing-free"
+        element={
+          <FeatureRoute feature="marketing-free">
+            <MarketingFree />
           </FeatureRoute>
         }
       />

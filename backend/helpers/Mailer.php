@@ -12,7 +12,7 @@ final class Mailer
         $this->config = $appConfig['mail'];
     }
 
-    public function send(string $to, string $subject, string $body, bool $isHtml = true): bool
+    public function send(string $to, string $subject, string $body, bool $isHtml = true, ?string $replyTo = null): bool
     {
         $autoload = dirname(__DIR__) . '/vendor/autoload.php';
 
@@ -20,14 +20,14 @@ final class Mailer
             require_once $autoload;
 
             if (class_exists(\PHPMailer\PHPMailer\PHPMailer::class)) {
-                return $this->sendViaPhpMailer($to, $subject, $body, $isHtml);
+                return $this->sendViaPhpMailer($to, $subject, $body, $isHtml, $replyTo);
             }
         }
 
-        return $this->sendViaMailFunction($to, $subject, $body, $isHtml);
+        return $this->sendViaMailFunction($to, $subject, $body, $isHtml, $replyTo);
     }
 
-    private function sendViaPhpMailer(string $to, string $subject, string $body, bool $isHtml): bool
+    private function sendViaPhpMailer(string $to, string $subject, string $body, bool $isHtml, ?string $replyTo = null): bool
     {
         try {
             $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
@@ -41,6 +41,9 @@ final class Mailer
 
             $mail->setFrom($this->config['from_address'], $this->config['from_name']);
             $mail->addAddress($to);
+            if ($replyTo && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+                $mail->addReplyTo($replyTo);
+            }
             $mail->Subject = $subject;
 
             if ($isHtml) {
@@ -59,11 +62,13 @@ final class Mailer
         }
     }
 
-    private function sendViaMailFunction(string $to, string $subject, string $body, bool $isHtml): bool
+    private function sendViaMailFunction(string $to, string $subject, string $body, bool $isHtml, ?string $replyTo = null): bool
     {
         $headers = [
             'From: ' . $this->config['from_name'] . ' <' . $this->config['from_address'] . '>',
-            'Reply-To: ' . $this->config['from_address'],
+            'Reply-To: ' . ($replyTo && filter_var($replyTo, FILTER_VALIDATE_EMAIL)
+                ? $replyTo
+                : $this->config['from_address']),
             'X-Mailer: PHP/' . PHP_VERSION,
         ];
 

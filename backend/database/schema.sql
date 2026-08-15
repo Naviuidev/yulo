@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
     role ENUM('customer', 'admin', 'super_admin', 'staff') DEFAULT 'customer',
     permissions JSON NULL,
     status ENUM('active', 'inactive', 'banned') DEFAULT 'active',
+    marketing_opt_in TINYINT(1) NOT NULL DEFAULT 1,
     email_verified_at DATETIME NULL,
     reset_token VARCHAR(255) NULL,
     reset_token_expires DATETIME NULL,
@@ -474,6 +475,26 @@ CREATE TABLE IF NOT EXISTS newsletter_subscribers (
     status ENUM('active', 'unsubscribed') DEFAULT 'active',
     subscribed_at DATETIME NOT NULL
 ) ENGINE=InnoDB;
+
+-- Digital marketing campaign send log
+CREATE TABLE IF NOT EXISTS marketing_campaigns (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    heading VARCHAR(255) NOT NULL,
+    description TEXT NULL,
+    banner_image VARCHAR(500) NULL,
+    product_link VARCHAR(500) NULL,
+    actual_price VARCHAR(50) NULL,
+    offer_price VARCHAR(50) NULL,
+    mode ENUM('one_to_one', 'bulk') NOT NULL DEFAULT 'one_to_one',
+    audience_type ENUM('users', 'customers', 'subscribed') NOT NULL DEFAULT 'users',
+    recipient_count INT UNSIGNED NOT NULL DEFAULT 0,
+    sent_count INT UNSIGNED NOT NULL DEFAULT 0,
+    failed_count INT UNSIGNED NOT NULL DEFAULT 0,
+    status ENUM('sent', 'partial', 'failed') NOT NULL DEFAULT 'sent',
+    triggered_by INT UNSIGNED NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_marketing_campaigns_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Contact messages
 CREATE TABLE IF NOT EXISTS contact_messages (

@@ -285,4 +285,13 @@ $router->group('/admin', function (Router $router) use ($admin) {
     $router->post('/staff-licences/{id}/ban', [StaffLicenceAdminController::class, 'ban'], $admin);
     $router->post('/staff-licences/{id}/unban', [StaffLicenceAdminController::class, 'unban'], $admin);
     $router->delete('/staff-licences/{id}', [StaffLicenceAdminController::class, 'destroy'], $admin);
+
+    // Marketing (master admin only — enforced in controller)
+    $router->get('/marketing/users', [MarketingAdminController::class, 'users'], $admin);
+    $router->get('/marketing/subscribers', [MarketingAdminController::class, 'subscribers'], $admin);
+    $router->get('/marketing/audience', [MarketingAdminController::class, 'audience'], $admin);
+    $router->get('/marketing/campaigns', [MarketingAdminController::class, 'campaigns'], $admin);
+    $router->post('/marketing/feature-request', [MarketingAdminController::class, 'featureRequest'], $admin);
+    $router->post('/marketing/upload-banner', [MarketingAdminController::class, 'uploadBanner'], $admin);
+    $router->post('/marketing/send-promotion', [MarketingAdminController::class, 'sendPromotion'], $admin);
 });

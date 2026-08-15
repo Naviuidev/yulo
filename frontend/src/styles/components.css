@@ -1025,15 +1025,17 @@
   position: relative;
   z-index: 1;
   width: min(420px, 92vw);
-  background: #111;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  max-height: min(78vh, 640px);
+  background: transparent;
+  box-shadow: none;
   animation: offer-popup-in 0.35s ease-out;
+  overflow: visible;
 }
 
 .offer-popup__close {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
+  top: -0.35rem;
+  right: -0.35rem;
   z-index: 2;
   width: 36px;
   height: 36px;
@@ -1042,13 +1044,14 @@
   justify-content: center;
   border: 0;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.72);
   color: #fff;
   cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 
 .offer-popup__close:hover {
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.88);
 }
 
 .offer-popup__img {
@@ -1056,7 +1059,10 @@
   width: 100%;
   height: auto;
   max-height: min(78vh, 640px);
-  object-fit: cover;
+  object-fit: contain;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
 }
 
 @keyframes offer-popup-in {
@@ -1542,6 +1548,143 @@
     align-items: center;
     text-align: left;
   }
+}
+
+/* Marketing opt-in popup (post-signup) */
+.marketing-optin-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 1080;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.marketing-optin-popup__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.marketing-optin-popup__card {
+  position: relative;
+  width: min(440px, 100%);
+  background: #fff;
+  border: 1px solid #111;
+  padding: 1.75rem 1.5rem 1.5rem;
+  animation: marketing-optin-in 0.3s ease-out;
+}
+
+.marketing-optin-popup__eyebrow {
+  margin: 0 0 0.5rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #666;
+}
+
+.marketing-optin-popup__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.5rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.marketing-optin-popup__text {
+  margin: 0 0 1.25rem;
+  color: #555;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.marketing-optin-popup__choice {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.marketing-optin-popup__choice input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: #111;
+}
+
+@keyframes marketing-optin-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Profile → Permissions */
+.profile-permission-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  justify-content: space-between;
+  align-items: flex-start;
+  max-width: 640px;
+  border: 1px solid var(--border, #ddd);
+  padding: 1.25rem 1.35rem;
+}
+
+.profile-permission-card__copy {
+  flex: 1 1 280px;
+}
+
+.profile-permission-card__toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.profile-opt-toggle {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  border: 1px solid #111;
+  background: #f3f3f3;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.profile-opt-toggle.is-on {
+  background: #111;
+}
+
+.profile-opt-toggle:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.profile-opt-toggle__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border: 1px solid #111;
+  transition: transform 0.2s ease;
+}
+
+.profile-opt-toggle.is-on .profile-opt-toggle__knob {
+  transform: translateX(24px);
+  background: #fff;
 }
 
 

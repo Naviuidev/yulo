@@ -24,10 +24,23 @@ const Sidebar = ({ collapsed, mobileOpen, onToggle, onMobileClose }) => {
             className={({ isActive }) =>
               `yulo-sidebar__link ${isActive ? 'yulo-sidebar__link--active' : ''}`
             }
-            title={item.label}
+            title={item.badge ? `${item.label} (${item.badge})` : item.label}
           >
             <i className={`bi ${item.icon}`} />
-            {!collapsed && <span>{item.label}</span>}
+            {!collapsed && (
+              <span className="yulo-sidebar__link-text">
+                <span>{item.label}</span>
+                {item.badge ? (
+                  <span
+                    className={`btn btn-dark rounded-pill btn-sm yulo-sidebar__plan-pill ${
+                      String(item.badge).toLowerCase() === 'free' ? 'yulo-sidebar__plan-pill--free' : ''
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                ) : null}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

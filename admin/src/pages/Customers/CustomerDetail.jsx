@@ -70,9 +70,16 @@ const CustomerDetail = () => {
             <div className="yulo-card-header"><h5>Profile</h5></div>
             <div className="yulo-card-body">
               <dl className="mb-0 small">
-                <dt className="text-muted">Phone</dt><dd>{customer.phone || '—'}</dd>
-                <dt className="text-muted">Status</dt><dd><StatusBadge status={customer.status} /></dd>
-                <dt className="text-muted">Joined</dt><dd>{formatDate(customer.created_at)}</dd>
+                <dt className="text-muted">Name</dt>
+                <dd>{customer.name || '—'}</dd>
+                <dt className="text-muted">Email</dt>
+                <dd>{customer.email || '—'}</dd>
+                <dt className="text-muted">Phone</dt>
+                <dd>{customer.phone || '—'}</dd>
+                <dt className="text-muted">Status</dt>
+                <dd><StatusBadge status={customer.status} /></dd>
+                <dt className="text-muted">Joined</dt>
+                <dd>{formatDate(customer.created_at)}</dd>
               </dl>
             </div>
           </div>

@@ -131,6 +131,63 @@ final class CashfreeClient
     }
 
     /**
+     * @return array{ok: bool, status: int, data: array<string, mixed>, message: string}
+     */
+    public function getOrderPayments(string $cashfreeOrderId): array
+    {
+        return $this->request('GET', '/orders/' . rawurlencode($cashfreeOrderId) . '/payments');
+    }
+
+    /**
+     * Create a refund against a Cashfree order.
+     *
+     * @return array{ok: bool, status: int, data: array<string, mixed>, message: string}
+     */
+    public function createOrderRefund(
+        string $cashfreeOrderId,
+        float $amount,
+        string $refundId,
+        string $note = ''
+    ): array {
+        $cashfreeOrderId = trim($cashfreeOrderId);
+        $refundId = trim($refundId);
+        if ($cashfreeOrderId === '' || $refundId === '') {
+            return [
+                'ok' => false,
+                'status' => 422,
+                'data' => [],
+                'message' => 'Cashfree order id and refund id are required.',
+            ];
+        }
+        if ($amount <= 0) {
+            return [
+                'ok' => false,
+                'status' => 422,
+                'data' => [],
+                'message' => 'Refund amount must be greater than zero.',
+            ];
+        }
+
+        $body = [
+            'refund_amount' => round($amount, 2),
+            'refund_id' => substr($refundId, 0, 50),
+        ];
+        if ($note !== '') {
+            $body['refund_note'] = mb_substr($note, 0, 200);
+        }
+
+        $result = $this->request(
+            'POST',
+            '/orders/' . rawurlencode($cashfreeOrderId) . '/refunds',
+            $body
+        );
+        if ($result['ok']) {
+            $result['message'] = 'Cashfree refund initiated.';
+        }
+        return $result;
+    }
+
+    /**
      * @param array<string, mixed>|null $body
      * @return array{ok: bool, status: int, data: array<string, mixed>, message: string}
      */

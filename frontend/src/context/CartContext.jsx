@@ -80,6 +80,7 @@ export function CartProvider({ children }) {
               gst_applicable: product.gst_applicable === undefined ? 1 : Number(product.gst_applicable) ? 1 : 0,
               custom_shipping: Number(product.custom_shipping) ? 1 : 0,
               shipping_price: product.shipping_price ?? null,
+              cod_available: product.cod_available === undefined ? 1 : Number(product.cod_available) ? 1 : 0,
               quantity,
               variant_id,
               size,

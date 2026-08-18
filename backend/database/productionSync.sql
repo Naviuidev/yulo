@@ -239,7 +239,7 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- B3) orders.payment_method accepts cashfree
 ALTER TABLE orders
-  MODIFY COLUMN payment_method ENUM('phonepe', 'stripe', 'cod', 'upi', 'cashfree') NULL;
+  MODIFY COLUMN payment_method ENUM('phonepe', 'stripe', 'cod', 'upi', 'cashfree', 'paytm', 'razorpay', 'payu') NULL;
 
 -- B4) orders.email_notified_at
 SET @sql := (

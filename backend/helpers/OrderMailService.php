@@ -76,6 +76,63 @@ final class OrderMailService
         return ['customer' => $customerOk, 'owner' => $ownerOk, 'skipped' => false];
     }
 
+    /**
+     * Send customer + owner emails after a COD order is placed (payment still pending).
+     *
+     * @return array{customer: bool, owner: bool, skipped: bool}
+     */
+    public function notifyCodOrder(int $orderId): array
+    {
+        SchemaGuard::ensureOrderEmailNotifiedAt($this->db);
+
+        $order = $this->loadOrder($orderId);
+        if (!$order) {
+            return ['customer' => false, 'owner' => false, 'skipped' => true];
+        }
+
+        if (!empty($order['email_notified_at'])) {
+            return ['customer' => false, 'owner' => false, 'skipped' => true];
+        }
+
+        if (($order['payment_method'] ?? '') !== 'cod') {
+            return ['customer' => false, 'owner' => false, 'skipped' => true];
+        }
+
+        $items = (new Order($this->db))->getItems($orderId);
+        $customerEmail = trim((string) ($order['customer_email'] ?? ''));
+        $ownerEmail = $this->resolveOwnerEmail();
+
+        $mailer = new Mailer();
+        $customerOk = false;
+        $ownerOk = false;
+
+        if ($customerEmail !== '' && filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+            $customerOk = $mailer->send(
+                $customerEmail,
+                'Your YULO COD order #' . $order['order_number'],
+                $this->buildInvoiceHtml($order, $items),
+                true
+            );
+        }
+
+        if ($ownerEmail !== '' && filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) {
+            $ownerOk = $mailer->send(
+                $ownerEmail,
+                'New YULO COD order #' . $order['order_number'],
+                $this->buildOwnerNotificationHtml($order, $items),
+                true
+            );
+        }
+
+        if ($customerOk || $ownerOk) {
+            $this->db->prepare(
+                'UPDATE orders SET email_notified_at = NOW(), updated_at = NOW() WHERE id = :id'
+            )->execute(['id' => $orderId]);
+        }
+
+        return ['customer' => $customerOk, 'owner' => $ownerOk, 'skipped' => false];
+    }
+
     private function loadOrder(int $orderId): ?array
     {
         $stmt = $this->db->prepare(
@@ -426,6 +483,97 @@ HTML;
         return [
             'sent' => $sent,
             'message' => $sent ? 'Status email sent to customer.' : 'Failed to send status email.',
+        ];
+    }
+
+    /**
+     * Email customer about return request decision (in_process / rejected / notes).
+     *
+     * @return array{sent: bool, message: string}
+     */
+    public function notifyReturnUpdate(int $orderId, string $returnStatus, string $adminNotes = ''): array
+    {
+        $order = $this->loadOrder($orderId);
+        if (!$order) {
+            return ['sent' => false, 'message' => 'Order not found.'];
+        }
+
+        $customerEmail = trim((string) ($order['customer_email'] ?? ''));
+        if ($customerEmail === '' || !filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+            return ['sent' => false, 'message' => 'Customer email is missing or invalid.'];
+        }
+
+        $labels = [
+            'in_process' => 'In process',
+            'rejected' => 'Not approved',
+            'completed' => 'Completed',
+            'requested' => 'Requested',
+        ];
+        $bodies = [
+            'in_process' => 'Your return request is being processed by our team.',
+            'rejected' => 'Your return request was not approved. If you have questions, reply to this email or contact support.',
+            'completed' => 'Your return has been completed.',
+            'requested' => 'We received your return request.',
+        ];
+        $statusLabel = $labels[$returnStatus] ?? ucfirst(str_replace('_', ' ', $returnStatus));
+        $bodyText = $bodies[$returnStatus] ?? ('Your return status is now: ' . $statusLabel);
+
+        $name = htmlspecialchars((string) ($order['customer_name'] ?? 'Customer'), ENT_QUOTES, 'UTF-8');
+        $orderNumber = htmlspecialchars((string) $order['order_number'], ENT_QUOTES, 'UTF-8');
+        $statusSafe = htmlspecialchars($statusLabel, ENT_QUOTES, 'UTF-8');
+        $bodySafe = htmlspecialchars($bodyText, ENT_QUOTES, 'UTF-8');
+        $notesBlock = '';
+        if (trim($adminNotes) !== '') {
+            $notesSafe = htmlspecialchars(trim($adminNotes), ENT_QUOTES, 'UTF-8');
+            $notesBlock = '<p style="margin:16px 0 0;padding:12px;background:#f6f6f6;font-size:13px;"><strong>Note from YULO:</strong><br>'
+                . nl2br($notesSafe) . '</p>';
+        }
+
+        $app = require dirname(__DIR__) . '/config/app.php';
+        $frontend = rtrim((string) ($app['frontend_url'] ?? ''), '/');
+        $profileUrl = $frontend !== ''
+            ? $frontend . '/profile?section=orders&order=' . (int) $order['id']
+            : '#';
+        $profileHref = htmlspecialchars($profileUrl, ENT_QUOTES, 'UTF-8');
+
+        $html = <<<HTML
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Return update {$orderNumber}</title></head>
+<body style="margin:0;padding:0;background:#f6f6f6;font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;">
+  <div style="max-width:560px;margin:24px auto;background:#ffffff;border:1px solid #e8e8e8;">
+    <div style="padding:24px 28px;border-bottom:2px solid #111;">
+      <div style="font-size:18px;font-weight:700;letter-spacing:0.12em;">YULO</div>
+      <div style="margin-top:6px;font-size:14px;color:#666;">Return update</div>
+    </div>
+    <div style="padding:24px 28px;font-size:14px;line-height:1.5;">
+      <p style="margin:0 0 12px;">Hi {$name},</p>
+      <p style="margin:0 0 16px;color:#444;">{$bodySafe}</p>
+      <table style="width:100%;font-size:13px;margin-bottom:12px;">
+        <tr><td style="padding:4px 0;color:#666;">Order</td><td style="padding:4px 0;text-align:right;font-weight:600;">#{$orderNumber}</td></tr>
+        <tr><td style="padding:4px 0;color:#666;">Return status</td><td style="padding:4px 0;text-align:right;font-weight:600;">{$statusSafe}</td></tr>
+      </table>
+      {$notesBlock}
+      <p style="margin:20px 0 0;">
+        <a href="{$profileHref}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:12px 18px;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;">View order</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+HTML;
+
+        $mailer = new Mailer();
+        $sent = $mailer->send(
+            $customerEmail,
+            'YULO return update — Order #' . $order['order_number'],
+            $html,
+            true
+        );
+
+        return [
+            'sent' => $sent,
+            'message' => $sent ? 'Return email sent to customer.' : 'Failed to send return email.',
         ];
     }
 

@@ -16,6 +16,9 @@ const FOOTER_LINKS = {
     { to: '/track-order', label: 'Track Order' },
     { to: '/contact', label: 'Contact Us' },
     { to: '/about', label: 'About YULO' },
+    { to: '/shipping-policy', label: 'Shipping Policy' },
+    { to: '/returns-policy', label: 'Returns & Refunds' },
+    { to: '/terms', label: 'Terms & Conditions' },
     { to: '/privacy-policy', label: 'Privacy Policy' },
   ],
   Account: [
@@ -84,7 +87,12 @@ export default function Footer() {
         </div>
         <div className="yulo-footer__bottom">
           <span>© {new Date().getFullYear()} YULO. All rights reserved.</span>
-          <Link to="/privacy-policy">Privacy Policy</Link>
+          <div className="d-flex flex-wrap gap-3 justify-content-center">
+            <Link to="/terms">Terms</Link>
+            <Link to="/shipping-policy">Shipping</Link>
+            <Link to="/returns-policy">Returns</Link>
+            <Link to="/privacy-policy">Privacy</Link>
+          </div>
         </div>
       </div>
     </footer>

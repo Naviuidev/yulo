@@ -21,6 +21,12 @@ final class CheckoutController extends BaseController
         $shipping = Pricing::shippingFromItems($items, (float) $subtotal, 999.0, 49.0);
         $tax = Pricing::gstTaxFromItems($items, 0.0);
 
+        $codAvailable = $items !== [] && array_reduce(
+            $items,
+            static fn (bool $ok, array $item): bool => $ok && (int) ($item['cod_available'] ?? 1) === 1,
+            true
+        );
+
         $addrStmt = $this->db->prepare('SELECT * FROM addresses WHERE user_id = :user_id ORDER BY is_default DESC');
         $addrStmt->execute(['user_id' => $userId]);
 
@@ -32,6 +38,7 @@ final class CheckoutController extends BaseController
                 'shipping' => $shipping,
                 'tax' => $tax,
                 'total' => round($subtotal + $shipping + $tax, 2),
+                'cod_available' => $codAvailable,
             ],
         ]);
     }
@@ -55,6 +62,10 @@ final class CheckoutController extends BaseController
         $client = new CashfreeClient($this->db);
         if (!$client->isConfigured()) {
             Response::jsonError('Cashfree is not configured. Add App ID and Secret Key under Admin → Payments.', 422);
+        }
+
+        if (PaymentGatewaySettings::getPublished($this->db) !== 'cashfree') {
+            Response::jsonError('Easy Cash is not published. Publish it under Admin → Payments to collect payments on the website.', 422);
         }
 
         $cartModel = new Cart($this->db);
@@ -287,6 +298,1147 @@ final class CheckoutController extends BaseController
         ], 'Cashfree payment ready.');
     }
 
+    /** Create order + PhonePe Standard Checkout v2 redirect. */
+    public function payPhonePe(array $params = []): void
+    {
+        $input = $this->getJsonInput();
+        $userId = $this->authUserId();
+        SchemaGuard::ensureCashfreePaymentMethod($this->db);
+
+        $validator = Validator::make($input)->required('shipping_address_id')->integer('shipping_address_id');
+        if ($validator->fails()) {
+            Response::jsonError('Validation failed.', 422, $validator->errors());
+        }
+
+        $client = new PhonePeClient($this->db);
+        if (!$client->isConfigured()) {
+            Response::jsonError('PhonePe is not configured. Add Client ID and Client Secret under Admin → Payments.', 422);
+        }
+
+        if (PaymentGatewaySettings::getPublished($this->db) !== 'phonepe') {
+            Response::jsonError('PhonePe is not published. Publish it under Admin → Payments to collect payments on the website.', 422);
+        }
+
+        $cartModel = new Cart($this->db);
+        $orderModel = new Order($this->db);
+        $cartId = $cartModel->getOrCreate($userId);
+        $items = $cartModel->getItems($cartId);
+
+        if (empty($items)) {
+            Response::jsonError('Cart is empty.', 422);
+        }
+
+        $addrStmt = $this->db->prepare('SELECT * FROM addresses WHERE id = :id AND user_id = :user_id LIMIT 1');
+        $addrStmt->execute(['id' => $input['shipping_address_id'], 'user_id' => $userId]);
+        $address = $addrStmt->fetch();
+
+        if (!$address) {
+            Response::jsonError('Shipping address not found.', 404);
+        }
+
+        $phone = preg_replace('/\D+/', '', (string) ($address['phone'] ?? ''));
+        $phone = substr((string) $phone, -10);
+        if (strlen($phone) !== 10) {
+            Response::jsonError('A valid 10-digit phone number is required on the delivery address for payment.', 422);
+        }
+
+        $subtotal = 0.0;
+        foreach ($items as $item) {
+            $subtotal += Pricing::unitPriceFromItem($item) * (int) $item['quantity'];
+        }
+
+        $discount = 0.0;
+        $couponId = null;
+        if (!empty($input['coupon_code'])) {
+            $couponModel = new Coupon($this->db);
+            $coupon = $couponModel->findByCode((string) $input['coupon_code']);
+            if ($coupon && !$couponModel->isExpired($coupon)) {
+                if ($coupon['max_uses'] === null || (int) $coupon['used_count'] < (int) $coupon['max_uses']) {
+                    if ((float) ($coupon['min_order_amount'] ?? 0) <= $subtotal) {
+                        $discount = $couponModel->calculateDiscount($coupon, $subtotal);
+                        if ($discount > 0) {
+                            $couponId = (int) $coupon['id'];
+                        }
+                    }
+                }
+            }
+        }
+
+        $shipping = Pricing::shippingFromItems($items, $subtotal);
+        $tax = Pricing::gstTaxFromItems($items, $discount);
+        $total = round($subtotal - $discount + $shipping + $tax, 2);
+
+        $orderId = 0;
+        $orderNumber = '';
+
+        try {
+            $this->db->beginTransaction();
+
+            $orderNumber = $orderModel->generateOrderNumber();
+            $stmt = $this->db->prepare(
+                'INSERT INTO orders (user_id, order_number, status, subtotal, discount, shipping_charge, tax, total,
+                                     coupon_id, payment_status, payment_method, shipping_address, billing_address, notes, created_at, updated_at)
+                 VALUES (:user_id, :order_number, :status, :subtotal, :discount, :shipping, :tax, :total,
+                         :coupon_id, :payment_status, :payment_method, :shipping_address, :billing_address, :notes, NOW(), NOW())'
+            );
+            $stmt->execute([
+                'user_id' => $userId,
+                'order_number' => $orderNumber,
+                'status' => 'pending',
+                'subtotal' => $subtotal,
+                'discount' => $discount,
+                'shipping' => $shipping,
+                'tax' => $tax,
+                'total' => $total,
+                'coupon_id' => $couponId,
+                'payment_status' => 'pending',
+                'payment_method' => 'phonepe',
+                'shipping_address' => json_encode($address),
+                'billing_address' => json_encode($input['billing_address'] ?? $address),
+                'notes' => $input['notes'] ?? null,
+            ]);
+
+            $orderId = (int) $this->db->lastInsertId();
+
+            $itemStmt = $this->db->prepare(
+                'INSERT INTO order_items (order_id, product_id, variant_id, quantity, price, total, color, size, created_at)
+                 VALUES (:order_id, :product_id, :variant_id, :quantity, :price, :total, :color, :size, NOW())'
+            );
+
+            SchemaGuard::ensureCartOrderItemOptions($this->db);
+
+            foreach ($items as $item) {
+                $variantId = !empty($item['variant_id']) ? (int) $item['variant_id'] : null;
+                $price = Pricing::unitPriceFromItem($item);
+                $lineTotal = $price * (int) $item['quantity'];
+
+                $itemStmt->execute([
+                    'order_id' => $orderId,
+                    'product_id' => (int) $item['product_id'],
+                    'variant_id' => $variantId,
+                    'quantity' => (int) $item['quantity'],
+                    'price' => $price,
+                    'total' => $lineTotal,
+                    'color' => $this->nullableTrim($item['color'] ?? null, 100),
+                    'size' => $this->nullableTrim($item['size'] ?? null, 20),
+                ]);
+
+                if ($variantId) {
+                    $this->db->prepare(
+                        'UPDATE product_variants SET stock = stock - :qty WHERE id = :id AND stock >= :min_qty'
+                    )->execute([
+                        'qty' => (int) $item['quantity'],
+                        'min_qty' => (int) $item['quantity'],
+                        'id' => $variantId,
+                    ]);
+                } else {
+                    $this->db->prepare(
+                        'UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :min_qty'
+                    )->execute([
+                        'qty' => (int) $item['quantity'],
+                        'min_qty' => (int) $item['quantity'],
+                        'id' => (int) $item['product_id'],
+                    ]);
+                }
+            }
+
+            if ($couponId) {
+                (new Coupon($this->db))->incrementUsage($couponId);
+            }
+
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('PhonePe checkout order create failed: ' . $e->getMessage());
+            Response::jsonError('Failed to create order.', 500);
+        }
+
+        $appConfig = require dirname(__DIR__) . '/config/app.php';
+        $frontendUrl = rtrim((string) ($appConfig['frontend_url'] ?? ''), '/');
+        if ($frontendUrl === '') {
+            $frontendUrl = 'http://localhost:5173';
+        }
+
+        $merchantOrderId = preg_replace('/[^A-Za-z0-9_-]/', '', (string) $orderNumber);
+        if ($merchantOrderId === '') {
+            $merchantOrderId = 'YULO' . $orderId . 'T' . time();
+        }
+
+        $redirectUrl = $frontendUrl . '/payment/phonepe/return?order_id=' . rawurlencode($merchantOrderId);
+        $amountPaise = (int) round($total * 100);
+
+        $result = $client->createPayment([
+            'merchantOrderId' => $merchantOrderId,
+            'amount' => $amountPaise,
+            'redirectUrl' => $redirectUrl,
+            'message' => 'YULO order #' . $orderNumber,
+        ]);
+
+        if (!$result['ok']) {
+            error_log('PhonePe create payment failed: ' . $result['message'] . ' ' . json_encode($result['data']));
+            $this->rollbackUnpaidCashfreeOrder($orderId);
+            Response::jsonError($result['message'] ?: 'Unable to start PhonePe payment.', 422, is_array($result['data']) ? $result['data'] : []);
+        }
+
+        $redirectPayUrl = (string) ($result['data']['redirectUrl'] ?? '');
+        if ($redirectPayUrl === '') {
+            $this->rollbackUnpaidCashfreeOrder($orderId);
+            Response::jsonError('PhonePe did not return a payment URL.', 502, $result['data']);
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            $this->db->prepare(
+                'INSERT INTO payments (order_id, gateway, transaction_id, amount, status, metadata, created_at, updated_at)
+                 VALUES (:order_id, :gateway, :transaction_id, :amount, :status, :metadata, NOW(), NOW())'
+            )->execute([
+                'order_id' => $orderId,
+                'gateway' => 'phonepe',
+                'transaction_id' => $merchantOrderId,
+                'amount' => $total,
+                'status' => 'initiated',
+                'metadata' => json_encode([
+                    'phonepe_response' => $result['data'],
+                    'env' => $client->getEnv(),
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ]);
+
+            $paymentId = (int) $this->db->lastInsertId();
+            $cartModel->clear($cartId);
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('PhonePe payment record failed: ' . $e->getMessage());
+            $paymentId = 0;
+        }
+
+        Response::jsonSuccess([
+            'payment_id' => $paymentId,
+            'order_id' => $orderId,
+            'order_number' => $orderNumber,
+            'merchant_order_id' => $merchantOrderId,
+            'redirect_url' => $redirectPayUrl,
+            'env' => $client->getEnv(),
+            'return_url' => $redirectUrl,
+            'total' => $total,
+        ], 'PhonePe payment ready.');
+    }
+
+    /** Create order + Paytm JS Checkout txn token. */
+    public function payPaytm(array $params = []): void
+    {
+        $input = $this->getJsonInput();
+        $userId = $this->authUserId();
+        SchemaGuard::ensureCashfreePaymentMethod($this->db);
+
+        $validator = Validator::make($input)->required('shipping_address_id')->integer('shipping_address_id');
+        if ($validator->fails()) {
+            Response::jsonError('Validation failed.', 422, $validator->errors());
+        }
+
+        $client = new PaytmClient($this->db);
+        if (!$client->isConfigured()) {
+            Response::jsonError('Paytm is not configured. Add Merchant ID and Merchant Key under Admin → Payments.', 422);
+        }
+
+        if (PaymentGatewaySettings::getPublished($this->db) !== 'paytm') {
+            Response::jsonError('Paytm is not published. Publish it under Admin → Payments to collect payments on the website.', 422);
+        }
+
+        $cartModel = new Cart($this->db);
+        $orderModel = new Order($this->db);
+        $cartId = $cartModel->getOrCreate($userId);
+        $items = $cartModel->getItems($cartId);
+
+        if (empty($items)) {
+            Response::jsonError('Cart is empty.', 422);
+        }
+
+        $addrStmt = $this->db->prepare('SELECT * FROM addresses WHERE id = :id AND user_id = :user_id LIMIT 1');
+        $addrStmt->execute(['id' => $input['shipping_address_id'], 'user_id' => $userId]);
+        $address = $addrStmt->fetch();
+
+        if (!$address) {
+            Response::jsonError('Shipping address not found.', 404);
+        }
+
+        $phone = preg_replace('/\D+/', '', (string) ($address['phone'] ?? ''));
+        $phone = substr((string) $phone, -10);
+        if (strlen($phone) !== 10) {
+            Response::jsonError('A valid 10-digit phone number is required on the delivery address for payment.', 422);
+        }
+
+        $subtotal = 0.0;
+        foreach ($items as $item) {
+            $subtotal += Pricing::unitPriceFromItem($item) * (int) $item['quantity'];
+        }
+
+        $discount = 0.0;
+        $couponId = null;
+        if (!empty($input['coupon_code'])) {
+            $couponModel = new Coupon($this->db);
+            $coupon = $couponModel->findByCode((string) $input['coupon_code']);
+            if ($coupon && !$couponModel->isExpired($coupon)) {
+                if ($coupon['max_uses'] === null || (int) $coupon['used_count'] < (int) $coupon['max_uses']) {
+                    if ((float) ($coupon['min_order_amount'] ?? 0) <= $subtotal) {
+                        $discount = $couponModel->calculateDiscount($coupon, $subtotal);
+                        if ($discount > 0) {
+                            $couponId = (int) $coupon['id'];
+                        }
+                    }
+                }
+            }
+        }
+
+        $shipping = Pricing::shippingFromItems($items, $subtotal);
+        $tax = Pricing::gstTaxFromItems($items, $discount);
+        $total = round($subtotal - $discount + $shipping + $tax, 2);
+
+        $orderId = 0;
+        $orderNumber = '';
+
+        try {
+            $this->db->beginTransaction();
+
+            $orderNumber = $orderModel->generateOrderNumber();
+            $stmt = $this->db->prepare(
+                'INSERT INTO orders (user_id, order_number, status, subtotal, discount, shipping_charge, tax, total,
+                                     coupon_id, payment_status, payment_method, shipping_address, billing_address, notes, created_at, updated_at)
+                 VALUES (:user_id, :order_number, :status, :subtotal, :discount, :shipping, :tax, :total,
+                         :coupon_id, :payment_status, :payment_method, :shipping_address, :billing_address, :notes, NOW(), NOW())'
+            );
+            $stmt->execute([
+                'user_id' => $userId,
+                'order_number' => $orderNumber,
+                'status' => 'pending',
+                'subtotal' => $subtotal,
+                'discount' => $discount,
+                'shipping' => $shipping,
+                'tax' => $tax,
+                'total' => $total,
+                'coupon_id' => $couponId,
+                'payment_status' => 'pending',
+                'payment_method' => 'paytm',
+                'shipping_address' => json_encode($address),
+                'billing_address' => json_encode($input['billing_address'] ?? $address),
+                'notes' => $input['notes'] ?? null,
+            ]);
+
+            $orderId = (int) $this->db->lastInsertId();
+
+            $itemStmt = $this->db->prepare(
+                'INSERT INTO order_items (order_id, product_id, variant_id, quantity, price, total, color, size, created_at)
+                 VALUES (:order_id, :product_id, :variant_id, :quantity, :price, :total, :color, :size, NOW())'
+            );
+
+            SchemaGuard::ensureCartOrderItemOptions($this->db);
+
+            foreach ($items as $item) {
+                $variantId = !empty($item['variant_id']) ? (int) $item['variant_id'] : null;
+                $price = Pricing::unitPriceFromItem($item);
+                $lineTotal = $price * (int) $item['quantity'];
+
+                $itemStmt->execute([
+                    'order_id' => $orderId,
+                    'product_id' => (int) $item['product_id'],
+                    'variant_id' => $variantId,
+                    'quantity' => (int) $item['quantity'],
+                    'price' => $price,
+                    'total' => $lineTotal,
+                    'color' => $this->nullableTrim($item['color'] ?? null, 100),
+                    'size' => $this->nullableTrim($item['size'] ?? null, 20),
+                ]);
+
+                if ($variantId) {
+                    $this->db->prepare(
+                        'UPDATE product_variants SET stock = stock - :qty WHERE id = :id AND stock >= :min_qty'
+                    )->execute([
+                        'qty' => (int) $item['quantity'],
+                        'min_qty' => (int) $item['quantity'],
+                        'id' => $variantId,
+                    ]);
+                } else {
+                    $this->db->prepare(
+                        'UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :min_qty'
+                    )->execute([
+                        'qty' => (int) $item['quantity'],
+                        'min_qty' => (int) $item['quantity'],
+                        'id' => (int) $item['product_id'],
+                    ]);
+                }
+            }
+
+            if ($couponId) {
+                (new Coupon($this->db))->incrementUsage($couponId);
+            }
+
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('Paytm checkout order create failed: ' . $e->getMessage());
+            Response::jsonError('Failed to create order.', 500);
+        }
+
+        $appConfig = require dirname(__DIR__) . '/config/app.php';
+        $frontendUrl = rtrim((string) ($appConfig['frontend_url'] ?? ''), '/');
+        if ($frontendUrl === '') {
+            $frontendUrl = 'http://localhost:5173';
+        }
+
+        $paytmOrderId = preg_replace('/[^A-Za-z0-9_-]/', '', (string) $orderNumber);
+        if ($paytmOrderId === '') {
+            $paytmOrderId = 'YULO' . $orderId . 'T' . time();
+        }
+
+        $userStmt = $this->db->prepare('SELECT name, email FROM users WHERE id = :id LIMIT 1');
+        $userStmt->execute(['id' => $userId]);
+        $user = $userStmt->fetch() ?: [];
+        $customerEmail = (string) ($user['email'] ?? '');
+        if ($customerEmail === '' || !filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+            $customerEmail = 'user' . $userId . '@yulo.local';
+        }
+
+        $callbackUrl = $frontendUrl . '/payment/paytm/return?order_id=' . rawurlencode($paytmOrderId);
+
+        $result = $client->initiateTransaction([
+            'orderId' => $paytmOrderId,
+            'amount' => $total,
+            'customerId' => 'user_' . $userId,
+            'callbackUrl' => $callbackUrl,
+            'mobile' => $phone,
+            'email' => $customerEmail,
+        ]);
+
+        if (!$result['ok'] || empty($result['txn_token'])) {
+            error_log('Paytm initiate failed: ' . $result['message'] . ' ' . json_encode($result['data']));
+            $this->rollbackUnpaidCashfreeOrder($orderId);
+            Response::jsonError($result['message'] ?: 'Unable to start Paytm payment.', 422, is_array($result['data']) ? $result['data'] : []);
+        }
+
+        $txnToken = (string) $result['txn_token'];
+        $amountStr = number_format($total, 2, '.', '');
+
+        try {
+            $this->db->beginTransaction();
+
+            $this->db->prepare(
+                'INSERT INTO payments (order_id, gateway, transaction_id, amount, status, metadata, created_at, updated_at)
+                 VALUES (:order_id, :gateway, :transaction_id, :amount, :status, :metadata, NOW(), NOW())'
+            )->execute([
+                'order_id' => $orderId,
+                'gateway' => 'paytm',
+                'transaction_id' => $paytmOrderId,
+                'amount' => $total,
+                'status' => 'initiated',
+                'metadata' => json_encode([
+                    'paytm_response' => $result['data'],
+                    'txn_token' => $txnToken,
+                    'env' => $client->getEnv(),
+                    'mid' => $client->getMid(),
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ]);
+
+            $paymentId = (int) $this->db->lastInsertId();
+            $cartModel->clear($cartId);
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('Paytm payment record failed: ' . $e->getMessage());
+            $paymentId = 0;
+        }
+
+        Response::jsonSuccess([
+            'payment_id' => $paymentId,
+            'order_id' => $orderId,
+            'order_number' => $orderNumber,
+            'paytm_order_id' => $paytmOrderId,
+            'txn_token' => $txnToken,
+            'amount' => $amountStr,
+            'mid' => $client->getMid(),
+            'env' => $client->getEnv(),
+            'checkout_js_url' => $client->checkoutJsUrl(),
+            'return_url' => $callbackUrl,
+            'total' => $total,
+        ], 'Paytm payment ready.');
+    }
+
+    /** Create order + Razorpay Checkout order. */
+    public function payRazorpay(array $params = []): void
+    {
+        $input = $this->getJsonInput();
+        $userId = $this->authUserId();
+        SchemaGuard::ensureCashfreePaymentMethod($this->db);
+
+        $validator = Validator::make($input)->required('shipping_address_id')->integer('shipping_address_id');
+        if ($validator->fails()) {
+            Response::jsonError('Validation failed.', 422, $validator->errors());
+        }
+
+        $client = new RazorpayClient($this->db);
+        if (!$client->isConfigured()) {
+            Response::jsonError('Razorpay is not configured. Add Key ID and Key Secret under Admin → Payments.', 422);
+        }
+
+        if (PaymentGatewaySettings::getPublished($this->db) !== 'razorpay') {
+            Response::jsonError('Razorpay is not published. Publish it under Admin → Payments to collect payments on the website.', 422);
+        }
+
+        $cartModel = new Cart($this->db);
+        $orderModel = new Order($this->db);
+        $cartId = $cartModel->getOrCreate($userId);
+        $items = $cartModel->getItems($cartId);
+
+        if (empty($items)) {
+            Response::jsonError('Cart is empty.', 422);
+        }
+
+        $addrStmt = $this->db->prepare('SELECT * FROM addresses WHERE id = :id AND user_id = :user_id LIMIT 1');
+        $addrStmt->execute(['id' => $input['shipping_address_id'], 'user_id' => $userId]);
+        $address = $addrStmt->fetch();
+
+        if (!$address) {
+            Response::jsonError('Shipping address not found.', 404);
+        }
+
+        $phone = preg_replace('/\D+/', '', (string) ($address['phone'] ?? ''));
+        $phone = substr((string) $phone, -10);
+        if (strlen($phone) !== 10) {
+            Response::jsonError('A valid 10-digit phone number is required on the delivery address for payment.', 422);
+        }
+
+        $subtotal = 0.0;
+        foreach ($items as $item) {
+            $subtotal += Pricing::unitPriceFromItem($item) * (int) $item['quantity'];
+        }
+
+        $discount = 0.0;
+        $couponId = null;
+        if (!empty($input['coupon_code'])) {
+            $couponModel = new Coupon($this->db);
+            $coupon = $couponModel->findByCode((string) $input['coupon_code']);
+            if ($coupon && !$couponModel->isExpired($coupon)) {
+                if ($coupon['max_uses'] === null || (int) $coupon['used_count'] < (int) $coupon['max_uses']) {
+                    if ((float) ($coupon['min_order_amount'] ?? 0) <= $subtotal) {
+                        $discount = $couponModel->calculateDiscount($coupon, $subtotal);
+                        if ($discount > 0) {
+                            $couponId = (int) $coupon['id'];
+                        }
+                    }
+                }
+            }
+        }
+
+        $shipping = Pricing::shippingFromItems($items, $subtotal);
+        $tax = Pricing::gstTaxFromItems($items, $discount);
+        $total = round($subtotal - $discount + $shipping + $tax, 2);
+
+        $orderId = 0;
+        $orderNumber = '';
+
+        try {
+            $this->db->beginTransaction();
+
+            $orderNumber = $orderModel->generateOrderNumber();
+            $stmt = $this->db->prepare(
+                'INSERT INTO orders (user_id, order_number, status, subtotal, discount, shipping_charge, tax, total,
+                                     coupon_id, payment_status, payment_method, shipping_address, billing_address, notes, created_at, updated_at)
+                 VALUES (:user_id, :order_number, :status, :subtotal, :discount, :shipping, :tax, :total,
+                         :coupon_id, :payment_status, :payment_method, :shipping_address, :billing_address, :notes, NOW(), NOW())'
+            );
+            $stmt->execute([
+                'user_id' => $userId,
+                'order_number' => $orderNumber,
+                'status' => 'pending',
+                'subtotal' => $subtotal,
+                'discount' => $discount,
+                'shipping' => $shipping,
+                'tax' => $tax,
+                'total' => $total,
+                'coupon_id' => $couponId,
+                'payment_status' => 'pending',
+                'payment_method' => 'razorpay',
+                'shipping_address' => json_encode($address),
+                'billing_address' => json_encode($input['billing_address'] ?? $address),
+                'notes' => $input['notes'] ?? null,
+            ]);
+
+            $orderId = (int) $this->db->lastInsertId();
+
+            $itemStmt = $this->db->prepare(
+                'INSERT INTO order_items (order_id, product_id, variant_id, quantity, price, total, color, size, created_at)
+                 VALUES (:order_id, :product_id, :variant_id, :quantity, :price, :total, :color, :size, NOW())'
+            );
+
+            SchemaGuard::ensureCartOrderItemOptions($this->db);
+
+            foreach ($items as $item) {
+                $variantId = !empty($item['variant_id']) ? (int) $item['variant_id'] : null;
+                $price = Pricing::unitPriceFromItem($item);
+                $lineTotal = $price * (int) $item['quantity'];
+
+                $itemStmt->execute([
+                    'order_id' => $orderId,
+                    'product_id' => (int) $item['product_id'],
+                    'variant_id' => $variantId,
+                    'quantity' => (int) $item['quantity'],
+                    'price' => $price,
+                    'total' => $lineTotal,
+                    'color' => $this->nullableTrim($item['color'] ?? null, 100),
+                    'size' => $this->nullableTrim($item['size'] ?? null, 20),
+                ]);
+
+                if ($variantId) {
+                    $this->db->prepare(
+                        'UPDATE product_variants SET stock = stock - :qty WHERE id = :id AND stock >= :min_qty'
+                    )->execute([
+                        'qty' => (int) $item['quantity'],
+                        'min_qty' => (int) $item['quantity'],
+                        'id' => $variantId,
+                    ]);
+                } else {
+                    $this->db->prepare(
+                        'UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :min_qty'
+                    )->execute([
+                        'qty' => (int) $item['quantity'],
+                        'min_qty' => (int) $item['quantity'],
+                        'id' => (int) $item['product_id'],
+                    ]);
+                }
+            }
+
+            if ($couponId) {
+                (new Coupon($this->db))->incrementUsage($couponId);
+            }
+
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('Razorpay checkout order create failed: ' . $e->getMessage());
+            Response::jsonError('Failed to create order.', 500);
+        }
+
+        $userStmt = $this->db->prepare('SELECT name, email FROM users WHERE id = :id LIMIT 1');
+        $userStmt->execute(['id' => $userId]);
+        $user = $userStmt->fetch() ?: [];
+        $customerName = (string) ($address['name'] ?? $address['full_name'] ?? $user['name'] ?? 'Customer');
+        $customerEmail = (string) ($user['email'] ?? '');
+        if ($customerEmail === '' || !filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+            $customerEmail = 'user' . $userId . '@yulo.local';
+        }
+
+        $amountPaise = (int) round($total * 100);
+        $receipt = preg_replace('/[^A-Za-z0-9]/', '', (string) $orderNumber);
+        if ($receipt === '') {
+            $receipt = 'YULO' . $orderId;
+        }
+        $receipt = substr($receipt, 0, 40);
+
+        $result = $client->createOrder([
+            'amount' => $amountPaise,
+            'receipt' => $receipt,
+            'notes' => [
+                'yulo_order_id' => (string) $orderId,
+                'yulo_order_number' => (string) $orderNumber,
+            ],
+        ]);
+
+        if (!$result['ok'] || empty($result['order_id'])) {
+            error_log('Razorpay create order failed: ' . $result['message'] . ' ' . json_encode($result['data']));
+            $this->rollbackUnpaidCashfreeOrder($orderId);
+            Response::jsonError($result['message'] ?: 'Unable to start Razorpay payment.', 422, is_array($result['data']) ? $result['data'] : []);
+        }
+
+        $razorpayOrderId = (string) $result['order_id'];
+
+        try {
+            $this->db->beginTransaction();
+
+            $this->db->prepare(
+                'INSERT INTO payments (order_id, gateway, transaction_id, amount, status, metadata, created_at, updated_at)
+                 VALUES (:order_id, :gateway, :transaction_id, :amount, :status, :metadata, NOW(), NOW())'
+            )->execute([
+                'order_id' => $orderId,
+                'gateway' => 'razorpay',
+                'transaction_id' => $razorpayOrderId,
+                'amount' => $total,
+                'status' => 'initiated',
+                'metadata' => json_encode([
+                    'razorpay_response' => $result['data'],
+                    'env' => $client->getEnv(),
+                    'key_id' => $client->getKeyId(),
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ]);
+
+            $paymentId = (int) $this->db->lastInsertId();
+            $cartModel->clear($cartId);
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('Razorpay payment record failed: ' . $e->getMessage());
+            $paymentId = 0;
+        }
+
+        Response::jsonSuccess([
+            'payment_id' => $paymentId,
+            'order_id' => $orderId,
+            'order_number' => $orderNumber,
+            'razorpay_order_id' => $razorpayOrderId,
+            'amount' => $amountPaise,
+            'currency' => 'INR',
+            'key_id' => $client->getKeyId(),
+            'env' => $client->getEnv(),
+            'prefill' => [
+                'name' => $customerName,
+                'email' => $customerEmail,
+                'contact' => $phone,
+            ],
+            'total' => $total,
+        ], 'Razorpay payment ready.');
+    }
+
+    /** Create order + PayU Hosted Checkout form fields. */
+    public function payPayU(array $params = []): void
+    {
+        $input = $this->getJsonInput();
+        $userId = $this->authUserId();
+        SchemaGuard::ensureCashfreePaymentMethod($this->db);
+
+        $validator = Validator::make($input)->required('shipping_address_id')->integer('shipping_address_id');
+        if ($validator->fails()) {
+            Response::jsonError('Validation failed.', 422, $validator->errors());
+        }
+
+        $client = new PayUClient($this->db);
+        if (!$client->isConfigured()) {
+            Response::jsonError('PayU is not configured. Add Merchant Key and Merchant Salt under Admin → Payments.', 422);
+        }
+
+        if (PaymentGatewaySettings::getPublished($this->db) !== 'payu') {
+            Response::jsonError('PayU is not published. Publish it under Admin → Payments to collect payments on the website.', 422);
+        }
+
+        $cartModel = new Cart($this->db);
+        $orderModel = new Order($this->db);
+        $cartId = $cartModel->getOrCreate($userId);
+        $items = $cartModel->getItems($cartId);
+
+        if (empty($items)) {
+            Response::jsonError('Cart is empty.', 422);
+        }
+
+        $addrStmt = $this->db->prepare('SELECT * FROM addresses WHERE id = :id AND user_id = :user_id LIMIT 1');
+        $addrStmt->execute(['id' => $input['shipping_address_id'], 'user_id' => $userId]);
+        $address = $addrStmt->fetch();
+
+        if (!$address) {
+            Response::jsonError('Shipping address not found.', 404);
+        }
+
+        $phone = preg_replace('/\D+/', '', (string) ($address['phone'] ?? ''));
+        $phone = substr((string) $phone, -10);
+        if (strlen($phone) !== 10) {
+            Response::jsonError('A valid 10-digit phone number is required on the delivery address for payment.', 422);
+        }
+
+        $subtotal = 0.0;
+        foreach ($items as $item) {
+            $subtotal += Pricing::unitPriceFromItem($item) * (int) $item['quantity'];
+        }
+
+        $discount = 0.0;
+        $couponId = null;
+        if (!empty($input['coupon_code'])) {
+            $couponModel = new Coupon($this->db);
+            $coupon = $couponModel->findByCode((string) $input['coupon_code']);
+            if ($coupon && !$couponModel->isExpired($coupon)) {
+                if ($coupon['max_uses'] === null || (int) $coupon['used_count'] < (int) $coupon['max_uses']) {
+                    if ((float) ($coupon['min_order_amount'] ?? 0) <= $subtotal) {
+                        $discount = $couponModel->calculateDiscount($coupon, $subtotal);
+                        if ($discount > 0) {
+                            $couponId = (int) $coupon['id'];
+                        }
+                    }
+                }
+            }
+        }
+
+        $shipping = Pricing::shippingFromItems($items, $subtotal);
+        $tax = Pricing::gstTaxFromItems($items, $discount);
+        $total = round($subtotal - $discount + $shipping + $tax, 2);
+
+        $orderId = 0;
+        $orderNumber = '';
+
+        try {
+            $this->db->beginTransaction();
+
+            $orderNumber = $orderModel->generateOrderNumber();
+            $stmt = $this->db->prepare(
+                'INSERT INTO orders (user_id, order_number, status, subtotal, discount, shipping_charge, tax, total,
+                                     coupon_id, payment_status, payment_method, shipping_address, billing_address, notes, created_at, updated_at)
+                 VALUES (:user_id, :order_number, :status, :subtotal, :discount, :shipping, :tax, :total,
+                         :coupon_id, :payment_status, :payment_method, :shipping_address, :billing_address, :notes, NOW(), NOW())'
+            );
+            $stmt->execute([
+                'user_id' => $userId,
+                'order_number' => $orderNumber,
+                'status' => 'pending',
+                'subtotal' => $subtotal,
+                'discount' => $discount,
+                'shipping' => $shipping,
+                'tax' => $tax,
+                'total' => $total,
+                'coupon_id' => $couponId,
+                'payment_status' => 'pending',
+                'payment_method' => 'payu',
+                'shipping_address' => json_encode($address),
+                'billing_address' => json_encode($input['billing_address'] ?? $address),
+                'notes' => $input['notes'] ?? null,
+            ]);
+
+            $orderId = (int) $this->db->lastInsertId();
+
+            $itemStmt = $this->db->prepare(
+                'INSERT INTO order_items (order_id, product_id, variant_id, quantity, price, total, color, size, created_at)
+                 VALUES (:order_id, :product_id, :variant_id, :quantity, :price, :total, :color, :size, NOW())'
+            );
+
+            SchemaGuard::ensureCartOrderItemOptions($this->db);
+
+            foreach ($items as $item) {
+                $variantId = !empty($item['variant_id']) ? (int) $item['variant_id'] : null;
+                $price = Pricing::unitPriceFromItem($item);
+                $lineTotal = $price * (int) $item['quantity'];
+
+                $itemStmt->execute([
+                    'order_id' => $orderId,
+                    'product_id' => (int) $item['product_id'],
+                    'variant_id' => $variantId,
+                    'quantity' => (int) $item['quantity'],
+                    'price' => $price,
+                    'total' => $lineTotal,
+                    'color' => $this->nullableTrim($item['color'] ?? null, 100),
+                    'size' => $this->nullableTrim($item['size'] ?? null, 20),
+                ]);
+
+                if ($variantId) {
+                    $this->db->prepare(
+                        'UPDATE product_variants SET stock = stock - :qty WHERE id = :id AND stock >= :min_qty'
+                    )->execute([
+                        'qty' => (int) $item['quantity'],
+                        'min_qty' => (int) $item['quantity'],
+                        'id' => $variantId,
+                    ]);
+                } else {
+                    $this->db->prepare(
+                        'UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :min_qty'
+                    )->execute([
+                        'qty' => (int) $item['quantity'],
+                        'min_qty' => (int) $item['quantity'],
+                        'id' => (int) $item['product_id'],
+                    ]);
+                }
+            }
+
+            if ($couponId) {
+                (new Coupon($this->db))->incrementUsage($couponId);
+            }
+
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('PayU checkout order create failed: ' . $e->getMessage());
+            Response::jsonError('Failed to create order.', 500);
+        }
+
+        $txnid = preg_replace('/[^A-Za-z0-9_-]/', '', (string) $orderNumber);
+        if ($txnid === '') {
+            $txnid = 'YULO' . $orderId . 'T' . time();
+        }
+
+        $userStmt = $this->db->prepare('SELECT name, email FROM users WHERE id = :id LIMIT 1');
+        $userStmt->execute(['id' => $userId]);
+        $user = $userStmt->fetch() ?: [];
+        $customerEmail = (string) ($user['email'] ?? '');
+        if ($customerEmail === '' || !filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+            $customerEmail = 'user' . $userId . '@yulo.local';
+        }
+        $customerName = trim((string) ($user['name'] ?? $address['full_name'] ?? $address['name'] ?? 'Customer'));
+        if ($customerName === '') {
+            $customerName = 'Customer';
+        }
+        $firstname = preg_replace('/\s+/', ' ', $customerName);
+        $firstname = trim((string) explode(' ', $firstname)[0]);
+        if ($firstname === '') {
+            $firstname = 'Customer';
+        }
+
+        $callbackUrl = PayUClient::suggestedCallbackUrl();
+        $form = $client->buildCheckoutForm([
+            'txnid' => $txnid,
+            'amount' => $total,
+            'productinfo' => 'Order ' . $orderNumber,
+            'firstname' => $firstname,
+            'email' => $customerEmail,
+            'phone' => $phone,
+            'surl' => $callbackUrl,
+            'furl' => $callbackUrl,
+            'udf1' => (string) $orderId,
+        ]);
+
+        if (!$form['ok'] || empty($form['params'])) {
+            error_log('PayU form build failed: ' . ($form['message'] ?? ''));
+            $this->rollbackUnpaidCashfreeOrder($orderId);
+            Response::jsonError($form['message'] ?: 'Unable to start PayU payment.', 422);
+        }
+
+        $paymentId = 0;
+        try {
+            $this->db->beginTransaction();
+
+            $this->db->prepare(
+                'INSERT INTO payments (order_id, gateway, transaction_id, amount, status, metadata, created_at, updated_at)
+                 VALUES (:order_id, :gateway, :transaction_id, :amount, :status, :metadata, NOW(), NOW())'
+            )->execute([
+                'order_id' => $orderId,
+                'gateway' => 'payu',
+                'transaction_id' => $txnid,
+                'amount' => $total,
+                'status' => 'initiated',
+                'metadata' => json_encode([
+                    'env' => $client->getEnv(),
+                    'surl' => $callbackUrl,
+                    'productinfo' => 'Order ' . $orderNumber,
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ]);
+
+            $paymentId = (int) $this->db->lastInsertId();
+            $cartModel->clear($cartId);
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('PayU payment record failed: ' . $e->getMessage());
+        }
+
+        Response::jsonSuccess([
+            'payment_id' => $paymentId,
+            'order_id' => $orderId,
+            'order_number' => $orderNumber,
+            'txnid' => $txnid,
+            'amount' => number_format($total, 2, '.', ''),
+            'env' => $client->getEnv(),
+            'action' => $form['action'],
+            'params' => $form['params'],
+            'total' => $total,
+        ], 'PayU payment ready.');
+    }
+
+    /**
+     * Place Cash on Delivery order when every cart product has cod_available enabled.
+     */
+    public function payCod(array $params = []): void
+    {
+        $input = $this->getJsonInput();
+        $userId = $this->authUserId();
+        SchemaGuard::ensureCashfreePaymentMethod($this->db);
+        SchemaGuard::ensureProductCommerceOptions($this->db);
+
+        $validator = Validator::make($input)->required('shipping_address_id')->integer('shipping_address_id');
+        if ($validator->fails()) {
+            Response::jsonError('Validation failed.', 422, $validator->errors());
+        }
+
+        $cartModel = new Cart($this->db);
+        $orderModel = new Order($this->db);
+        $cartId = $cartModel->getOrCreate($userId);
+        $items = $cartModel->getItems($cartId);
+
+        if (empty($items)) {
+            Response::jsonError('Cart is empty.', 422);
+        }
+
+        foreach ($items as $item) {
+            if ((int) ($item['cod_available'] ?? 1) !== 1) {
+                Response::jsonError(
+                    'Cash on Delivery is not available for one or more products in your cart. Please pay online.',
+                    422
+                );
+            }
+        }
+
+        $addrStmt = $this->db->prepare('SELECT * FROM addresses WHERE id = :id AND user_id = :user_id LIMIT 1');
+        $addrStmt->execute(['id' => $input['shipping_address_id'], 'user_id' => $userId]);
+        $address = $addrStmt->fetch();
+
+        if (!$address) {
+            Response::jsonError('Shipping address not found.', 404);
+        }
+
+        $phone = preg_replace('/\D+/', '', (string) ($address['phone'] ?? ''));
+        $phone = substr((string) $phone, -10);
+        if (strlen($phone) !== 10) {
+            Response::jsonError('A valid 10-digit phone number is required on the delivery address.', 422);
+        }
+
+        $subtotal = 0.0;
+        foreach ($items as $item) {
+            $subtotal += Pricing::unitPriceFromItem($item) * (int) $item['quantity'];
+        }
+
+        $discount = 0.0;
+        $couponId = null;
+        if (!empty($input['coupon_code'])) {
+            $couponModel = new Coupon($this->db);
+            $coupon = $couponModel->findByCode((string) $input['coupon_code']);
+            if ($coupon && !$couponModel->isExpired($coupon)) {
+                if ($coupon['max_uses'] === null || (int) $coupon['used_count'] < (int) $coupon['max_uses']) {
+                    if ((float) ($coupon['min_order_amount'] ?? 0) <= $subtotal) {
+                        $discount = $couponModel->calculateDiscount($coupon, $subtotal);
+                        if ($discount > 0) {
+                            $couponId = (int) $coupon['id'];
+                        }
+                    }
+                }
+            }
+        }
+
+        $shipping = Pricing::shippingFromItems($items, $subtotal);
+        $tax = Pricing::gstTaxFromItems($items, $discount);
+        $total = round($subtotal - $discount + $shipping + $tax, 2);
+
+        $orderId = 0;
+        $orderNumber = '';
+
+        try {
+            $this->db->beginTransaction();
+
+            $orderNumber = $orderModel->generateOrderNumber();
+            $stmt = $this->db->prepare(
+                'INSERT INTO orders (user_id, order_number, status, subtotal, discount, shipping_charge, tax, total,
+                                     coupon_id, payment_status, payment_method, shipping_address, billing_address, notes, created_at, updated_at)
+                 VALUES (:user_id, :order_number, :status, :subtotal, :discount, :shipping, :tax, :total,
+                         :coupon_id, :payment_status, :payment_method, :shipping_address, :billing_address, :notes, NOW(), NOW())'
+            );
+            $stmt->execute([
+                'user_id' => $userId,
+                'order_number' => $orderNumber,
+                'status' => 'confirmed',
+                'subtotal' => $subtotal,
+                'discount' => $discount,
+                'shipping' => $shipping,
+                'tax' => $tax,
+                'total' => $total,
+                'coupon_id' => $couponId,
+                'payment_status' => 'pending',
+                'payment_method' => 'cod',
+                'shipping_address' => json_encode($address),
+                'billing_address' => json_encode($input['billing_address'] ?? $address),
+                'notes' => $input['notes'] ?? null,
+            ]);
+
+            $orderId = (int) $this->db->lastInsertId();
+
+            $itemStmt = $this->db->prepare(
+                'INSERT INTO order_items (order_id, product_id, variant_id, quantity, price, total, color, size, created_at)
+                 VALUES (:order_id, :product_id, :variant_id, :quantity, :price, :total, :color, :size, NOW())'
+            );
+
+            SchemaGuard::ensureCartOrderItemOptions($this->db);
+
+            foreach ($items as $item) {
+                $variantId = !empty($item['variant_id']) ? (int) $item['variant_id'] : null;
+                $price = Pricing::unitPriceFromItem($item);
+                $lineTotal = $price * (int) $item['quantity'];
+
+                $itemStmt->execute([
+                    'order_id' => $orderId,
+                    'product_id' => (int) $item['product_id'],
+                    'variant_id' => $variantId,
+                    'quantity' => (int) $item['quantity'],
+                    'price' => $price,
+                    'total' => $lineTotal,
+                    'color' => $this->nullableTrim($item['color'] ?? null, 100),
+                    'size' => $this->nullableTrim($item['size'] ?? null, 20),
+                ]);
+
+                if ($variantId) {
+                    $this->db->prepare(
+                        'UPDATE product_variants SET stock = stock - :qty WHERE id = :id AND stock >= :min_qty'
+                    )->execute([
+                        'qty' => (int) $item['quantity'],
+                        'min_qty' => (int) $item['quantity'],
+                        'id' => $variantId,
+                    ]);
+                } else {
+                    $this->db->prepare(
+                        'UPDATE products SET stock = stock - :qty WHERE id = :id AND stock >= :min_qty'
+                    )->execute([
+                        'qty' => (int) $item['quantity'],
+                        'min_qty' => (int) $item['quantity'],
+                        'id' => (int) $item['product_id'],
+                    ]);
+                }
+            }
+
+            if ($couponId) {
+                (new Coupon($this->db))->incrementUsage($couponId);
+            }
+
+            $this->db->prepare(
+                'INSERT INTO payments (order_id, gateway, transaction_id, amount, status, metadata, created_at, updated_at)
+                 VALUES (:order_id, :gateway, :transaction_id, :amount, :status, :metadata, NOW(), NOW())'
+            )->execute([
+                'order_id' => $orderId,
+                'gateway' => 'cod',
+                'transaction_id' => $orderNumber,
+                'amount' => $total,
+                'status' => 'initiated',
+                'metadata' => json_encode(['method' => 'cod'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ]);
+
+            $cartModel->clear($cartId);
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('COD checkout failed: ' . $e->getMessage());
+            Response::jsonError('Failed to place COD order.', 500);
+        }
+
+        try {
+            (new OrderMailService($this->db))->notifyCodOrder($orderId);
+        } catch (Throwable $e) {
+            error_log('Order email notify failed (cod): ' . $e->getMessage());
+        }
+
+        Response::jsonSuccess([
+            'order_id' => $orderId,
+            'order_number' => $orderNumber,
+            'payment_method' => 'cod',
+            'payment_status' => 'pending',
+            'status' => 'confirmed',
+            'total' => $total,
+        ], 'COD order placed. Pay when your order is delivered.');
+    }
+
     /** Cancel unpaid order and restore stock after Cashfree session creation fails. */
     private function rollbackUnpaidCashfreeOrder(int $orderId): void
     {
@@ -459,7 +1611,7 @@ final class CheckoutController extends BaseController
         $shipping = Pricing::shippingFromItems($lineItems, (float) $subtotal, 999.0, 49.0);
         $tax = Pricing::gstTaxFromItems($lineItems, (float) $discount);
         $total = round($subtotal - $discount + $shipping + $tax, 2);
-        $paymentMethod = in_array($input['payment_method'] ?? '', ['phonepe', 'stripe', 'cod', 'upi', 'cashfree'], true)
+        $paymentMethod = in_array($input['payment_method'] ?? '', ['phonepe', 'stripe', 'cod', 'upi', 'cashfree', 'paytm', 'razorpay', 'payu'], true)
             ? $input['payment_method']
             : 'cashfree';
 

@@ -70,6 +70,11 @@ $router->get('/offer-card', [OfferCardController::class, 'show']);
 // Payments callback (public webhook)
 $router->post('/payments/phonepe/callback', [PaymentController::class, 'phonePeCallback']);
 $router->post('/payments/cashfree/webhook', [PaymentController::class, 'cashfreeWebhook']);
+$router->post('/payments/paytm/callback', [PaymentController::class, 'paytmCallback']);
+$router->post('/payments/razorpay/webhook', [PaymentController::class, 'razorpayWebhook']);
+$router->post('/payments/payu/callback', [PaymentController::class, 'payuCallback']);
+$router->get('/payments/payu/callback', [PaymentController::class, 'payuCallback']);
+$router->get('/payments/active-gateway', [PaymentController::class, 'activeGateway']);
 
 // Authenticated customer routes
 $auth = [AuthMiddleware::class];
@@ -93,11 +98,18 @@ $router->delete('/compare', [CompareController::class, 'clear'], $auth);
 $router->post('/checkout/guest', [CheckoutController::class, 'guest']);
 $router->get('/checkout/summary', [CheckoutController::class, 'summary'], $auth);
 $router->post('/checkout/cashfree', [CheckoutController::class, 'payCashfree'], $auth);
+$router->post('/checkout/phonepe', [CheckoutController::class, 'payPhonePe'], $auth);
+$router->post('/checkout/paytm', [CheckoutController::class, 'payPaytm'], $auth);
+$router->post('/checkout/razorpay', [CheckoutController::class, 'payRazorpay'], $auth);
+$router->post('/checkout/payu', [CheckoutController::class, 'payPayU'], $auth);
+$router->post('/checkout/cod', [CheckoutController::class, 'payCod'], $auth);
 $router->get('/orders', [OrderController::class, 'index'], $auth);
 $router->post('/orders', [OrderController::class, 'create'], $auth);
 $router->get('/orders/track/{order_number}', [OrderController::class, 'trackByNumber']);
 $router->get('/orders/{id}', [OrderController::class, 'show'], $auth);
 $router->post('/orders/{id}/cancel', [OrderController::class, 'cancel'], $auth);
+$router->post('/orders/{id}/return', [OrderController::class, 'requestReturn'], $auth);
+$router->post('/orders/{id}/help', [OrderController::class, 'sendHelp'], $auth);
 $router->get('/orders/{id}/track', [OrderController::class, 'track'], $auth);
 $router->get('/orders/{id}/invoice', [OrderController::class, 'invoice'], $auth);
 
@@ -107,8 +119,15 @@ $router->get('/followups/tracking/order/{order_id}', [FollowupController::class,
 $router->post('/reviews', [ReviewController::class, 'store'], $auth);
 $router->get('/reviews/purchased-products', [ReviewController::class, 'purchasedProducts'], $auth);
 $router->post('/payments/phonepe/initiate', [PaymentController::class, 'initiatePhonePe'], $auth);
+$router->post('/payments/phonepe/verify', [PaymentController::class, 'verifyPhonePe'], $auth);
 $router->post('/payments/cashfree/initiate', [PaymentController::class, 'initiateCashfree'], $auth);
 $router->post('/payments/cashfree/verify', [PaymentController::class, 'verifyCashfree'], $auth);
+$router->post('/payments/paytm/initiate', [PaymentController::class, 'initiatePaytm'], $auth);
+$router->post('/payments/paytm/verify', [PaymentController::class, 'verifyPaytm'], $auth);
+$router->post('/payments/razorpay/initiate', [PaymentController::class, 'initiateRazorpay'], $auth);
+$router->post('/payments/razorpay/verify', [PaymentController::class, 'verifyRazorpay'], $auth);
+$router->post('/payments/payu/initiate', [PaymentController::class, 'initiatePayU'], $auth);
+$router->post('/payments/payu/verify', [PaymentController::class, 'verifyPayU'], $auth);
 
 $router->get('/profile', [ProfileController::class, 'show'], $auth);
 $router->put('/profile', [ProfileController::class, 'update'], $auth);
@@ -161,6 +180,9 @@ $router->group('/admin', function (Router $router) use ($admin) {
     $router->get('/orders/{id}', [OrderAdminController::class, 'show'], $admin);
     $router->patch('/orders/{id}/status', [OrderAdminController::class, 'updateStatus'], $admin);
     $router->post('/orders/{id}/share-tracking', [OrderAdminController::class, 'shareTracking'], $admin);
+    $router->patch('/orders/{id}/return', [OrderAdminController::class, 'updateReturn'], $admin);
+    $router->post('/orders/{id}/help', [OrderAdminController::class, 'sendHelp'], $admin);
+    $router->post('/orders/{id}/shiprocket-shipment', [OrderAdminController::class, 'createShiprocketShipment'], $admin);
 
     $router->get('/customers', [CustomerAdminController::class, 'index'], $admin);
     $router->get('/customers/{id}', [CustomerAdminController::class, 'show'], $admin);
@@ -244,8 +266,22 @@ $router->group('/admin', function (Router $router) use ($admin) {
     $router->get('/settings', [SettingsAdminController::class, 'index'], $admin);
     $router->put('/settings', [SettingsAdminController::class, 'update'], $admin);
 
+    $router->get('/payments/overview', [PaymentAdminController::class, 'overview'], $admin);
     $router->get('/payments/cashfree', [PaymentAdminController::class, 'showCashfree'], $admin);
     $router->put('/payments/cashfree', [PaymentAdminController::class, 'updateCashfree'], $admin);
+    $router->get('/payments/phonepe', [PaymentAdminController::class, 'showPhonePe'], $admin);
+    $router->put('/payments/phonepe', [PaymentAdminController::class, 'updatePhonePe'], $admin);
+    $router->get('/payments/paytm', [PaymentAdminController::class, 'showPaytm'], $admin);
+    $router->put('/payments/paytm', [PaymentAdminController::class, 'updatePaytm'], $admin);
+    $router->post('/payments/paytm/test', [PaymentAdminController::class, 'testPaytm'], $admin);
+    $router->get('/payments/razorpay', [PaymentAdminController::class, 'showRazorpay'], $admin);
+    $router->put('/payments/razorpay', [PaymentAdminController::class, 'updateRazorpay'], $admin);
+    $router->post('/payments/razorpay/test', [PaymentAdminController::class, 'testRazorpay'], $admin);
+    $router->get('/payments/payu', [PaymentAdminController::class, 'showPayU'], $admin);
+    $router->put('/payments/payu', [PaymentAdminController::class, 'updatePayU'], $admin);
+    $router->post('/payments/payu/test', [PaymentAdminController::class, 'testPayU'], $admin);
+    $router->post('/payments/publish', [PaymentAdminController::class, 'publish'], $admin);
+    $router->post('/payments/unpublish', [PaymentAdminController::class, 'unpublish'], $admin);
     $router->get('/whatsapp', [WhatsAppAdminController::class, 'show'], $admin);
     $router->put('/whatsapp', [WhatsAppAdminController::class, 'update'], $admin);
     $router->get('/footer-socials', [FooterSocialAdminController::class, 'show'], $admin);

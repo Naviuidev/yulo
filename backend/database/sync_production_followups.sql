@@ -9,10 +9,10 @@
 SET @db := DATABASE();
 
 -- ---------------------------------------------------------------------------
--- 1) orders.payment_method must accept cashfree
+-- 1) orders.payment_method must accept cashfree + paytm + razorpay + payu
 -- ---------------------------------------------------------------------------
 ALTER TABLE orders
-  MODIFY COLUMN payment_method ENUM('phonepe', 'stripe', 'cod', 'upi', 'cashfree') NULL;
+  MODIFY COLUMN payment_method ENUM('phonepe', 'stripe', 'cod', 'upi', 'cashfree', 'paytm', 'razorpay', 'payu') NULL;
 
 -- ---------------------------------------------------------------------------
 -- 2) orders.email_notified_at (invoice / owner notify guard)

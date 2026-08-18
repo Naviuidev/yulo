@@ -49,6 +49,9 @@ const ProductForm = () => {
       price: '', sale_price: '', stock: 0, category_id: '', brand_id: '',
       status: 'active', is_featured: false, gst_applicable: true,
       custom_shipping: false, shipping_price: '',
+      cod_available: true,
+      cancel_available: true,
+      return_available: true,
       has_color_variants: false, enable_sizes: false,
     },
   });
@@ -56,6 +59,9 @@ const ProductForm = () => {
   const name = watch('name');
   const gstApplicable = watch('gst_applicable');
   const customShipping = watch('custom_shipping');
+  const codAvailable = watch('cod_available');
+  const cancelAvailable = watch('cancel_available');
+  const returnAvailable = watch('return_available');
   const hasColorVariants = watch('has_color_variants');
   const enableSizes = watch('enable_sizes');
 
@@ -100,6 +106,9 @@ const ProductForm = () => {
           gst_applicable: product.gst_applicable === undefined ? true : !!Number(product.gst_applicable),
           custom_shipping: !!Number(product.custom_shipping),
           shipping_price: product.shipping_price ?? '',
+          cod_available: product.cod_available === undefined ? true : !!Number(product.cod_available),
+          cancel_available: product.cancel_available === undefined ? true : !!Number(product.cancel_available),
+          return_available: product.return_available === undefined ? true : !!Number(product.return_available),
           has_color_variants: !!Number(product.has_color_variants),
           enable_sizes: false,
         });
@@ -207,6 +216,9 @@ const ProductForm = () => {
         gst_applicable: !!data.gst_applicable,
         custom_shipping: !!data.custom_shipping,
         shipping_price: data.custom_shipping ? Number(data.shipping_price) : null,
+        cod_available: !!data.cod_available,
+        cancel_available: !!data.cancel_available,
+        return_available: !!data.return_available,
         has_color_variants: !!data.has_color_variants,
         colors: data.has_color_variants
           ? colors.filter((c) => c.name.trim()).slice(0, 4).map((c) => ({
@@ -373,6 +385,54 @@ const ProductForm = () => {
                   </div>
                   <div className="form-check form-switch m-0">
                     <input type="checkbox" className="form-check-input" id="gst_applicable" {...register('gst_applicable')} />
+                  </div>
+                </div>
+              </div>
+
+              <div className={`yulo-option-card ${codAvailable ? 'is-on' : ''}`}>
+                <div className="yulo-option-card__head">
+                  <div>
+                    <div className="yulo-option-card__title">Cash on Delivery (COD)</div>
+                    <div className="yulo-option-card__hint">
+                      {codAvailable
+                        ? 'Buyers can choose COD if every cart item allows it'
+                        : 'Online payment only for this product'}
+                    </div>
+                  </div>
+                  <div className="form-check form-switch m-0">
+                    <input type="checkbox" className="form-check-input" id="cod_available" {...register('cod_available')} />
+                  </div>
+                </div>
+              </div>
+
+              <div className={`yulo-option-card ${cancelAvailable ? 'is-on' : ''}`}>
+                <div className="yulo-option-card__head">
+                  <div>
+                    <div className="yulo-option-card__title">Allow customer cancel</div>
+                    <div className="yulo-option-card__hint">
+                      {cancelAvailable
+                        ? 'Customer can cancel if every item in the order allows it'
+                        : 'Customer cannot cancel orders that include this product'}
+                    </div>
+                  </div>
+                  <div className="form-check form-switch m-0">
+                    <input type="checkbox" className="form-check-input" id="cancel_available" {...register('cancel_available')} />
+                  </div>
+                </div>
+              </div>
+
+              <div className={`yulo-option-card ${returnAvailable ? 'is-on' : ''}`}>
+                <div className="yulo-option-card__head">
+                  <div>
+                    <div className="yulo-option-card__title">Allow customer return</div>
+                    <div className="yulo-option-card__hint">
+                      {returnAvailable
+                        ? 'Customer can request a return after delivery if every item allows it'
+                        : 'Customer cannot return orders that include this product'}
+                    </div>
+                  </div>
+                  <div className="form-check form-switch m-0">
+                    <input type="checkbox" className="form-check-input" id="return_available" {...register('return_available')} />
                   </div>
                 </div>
               </div>

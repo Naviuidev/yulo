@@ -84,10 +84,10 @@ final class ProductAdminController extends BaseController
 
             $stmt = $this->db->prepare(
                 'INSERT INTO products (name, slug, description, short_description, sku, price, sale_price, gst_applicable,
-                 custom_shipping, shipping_price, has_color_variants, colors, size_option, sizes,
+                 custom_shipping, shipping_price, cod_available, cancel_available, return_available, has_color_variants, colors, size_option, sizes,
                  stock, category_id, brand_id, status, is_featured, created_at, updated_at)
                  VALUES (:name, :slug, :description, :short_description, :sku, :price, :sale_price, :gst_applicable,
-                 :custom_shipping, :shipping_price, :has_color_variants, :colors, :size_option, :sizes,
+                 :custom_shipping, :shipping_price, :cod_available, :cancel_available, :return_available, :has_color_variants, :colors, :size_option, :sizes,
                  :stock, :category_id, :brand_id, :status, :is_featured, NOW(), NOW())'
             );
             $stmt->execute([
@@ -101,6 +101,9 @@ final class ProductAdminController extends BaseController
                 'gst_applicable' => $input['gst_applicable'],
                 'custom_shipping' => $input['custom_shipping'],
                 'shipping_price' => $input['shipping_price'],
+                'cod_available' => $input['cod_available'],
+                'cancel_available' => $input['cancel_available'],
+                'return_available' => $input['return_available'],
                 'has_color_variants' => $input['has_color_variants'],
                 'colors' => $input['colors'],
                 'size_option' => $input['size_option'],
@@ -151,6 +154,7 @@ final class ProductAdminController extends BaseController
                 'UPDATE products SET name = :name, slug = :slug, description = :description, short_description = :short_description,
                  sku = :sku, price = :price, sale_price = :sale_price, gst_applicable = :gst_applicable,
                  custom_shipping = :custom_shipping, shipping_price = :shipping_price,
+                 cod_available = :cod_available, cancel_available = :cancel_available, return_available = :return_available,
                  has_color_variants = :has_color_variants, colors = :colors, size_option = :size_option, sizes = :sizes,
                  stock = :stock, category_id = :category_id, brand_id = :brand_id,
                  status = :status, is_featured = :is_featured, updated_at = NOW() WHERE id = :id'
@@ -166,6 +170,9 @@ final class ProductAdminController extends BaseController
                 'gst_applicable' => $input['gst_applicable'],
                 'custom_shipping' => $input['custom_shipping'],
                 'shipping_price' => $input['shipping_price'],
+                'cod_available' => $input['cod_available'],
+                'cancel_available' => $input['cancel_available'],
+                'return_available' => $input['return_available'],
                 'has_color_variants' => $input['has_color_variants'],
                 'colors' => $input['colors'],
                 'size_option' => $input['size_option'],
@@ -439,6 +446,15 @@ final class ProductAdminController extends BaseController
             'gst_applicable' => !empty($input['gst_applicable']) ? 1 : 0,
             'custom_shipping' => $customShipping,
             'shipping_price' => $customShipping ? $this->nullableNumber($input['shipping_price'] ?? null) : null,
+            'cod_available' => array_key_exists('cod_available', $input)
+                ? (!empty($input['cod_available']) ? 1 : 0)
+                : 1,
+            'cancel_available' => array_key_exists('cancel_available', $input)
+                ? (!empty($input['cancel_available']) ? 1 : 0)
+                : 1,
+            'return_available' => array_key_exists('return_available', $input)
+                ? (!empty($input['return_available']) ? 1 : 0)
+                : 1,
             'has_color_variants' => $hasColors,
             'colors' => $this->normalizeColors($input['colors'] ?? [], (bool) $hasColors),
             'size_option' => $sizeOption,

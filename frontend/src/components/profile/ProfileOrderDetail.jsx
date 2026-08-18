@@ -7,8 +7,12 @@ import Modal from '../ui/Modal';
 import { orderService, paymentService } from '../../services/orderService';
 import api from '../../services/api';
 import { openCashfreeCheckout } from '../../utils/cashfreeCheckout';
+import { openPaytmCheckout } from '../../utils/paytmCheckout';
+import { openRazorpayCheckout } from '../../utils/razorpayCheckout';
+import { openPayUCheckout } from '../../utils/payuCheckout';
 import { formatDate, getProductImage } from '../../utils/helpers';
 import { formatPrice } from '../../utils/formatPrice';
+import { openBlankInvoiceWindow, deliverInvoice } from '../../utils/invoiceDownload';
 import useAuth from '../../hooks/useAuth';
 
 const STATUS_COLORS = {
@@ -34,6 +38,14 @@ export default function ProfileOrderDetail({ orderId, onBack, onOrderUpdated }) 
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [returning, setReturning] = useState(false);
+  const [downloadingInvoice, setDownloadingInvoice] = useState(false);
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnReason, setReturnReason] = useState('');
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [helpMessage, setHelpMessage] = useState('');
+  const [helpSent, setHelpSent] = useState(false);
+  const [sendingHelp, setSendingHelp] = useState(false);
   const [showQueryModal, setShowQueryModal] = useState(false);
   const [submittingQuery, setSubmittingQuery] = useState(false);
   const [querySubject, setQuerySubject] = useState('Request for tracking details');
@@ -66,8 +78,16 @@ export default function ProfileOrderDetail({ orderId, onBack, onOrderUpdated }) 
   const cancelOrder = async () => {
     setCancelling(true);
     try {
-      await orderService.cancelOrder(orderId);
-      toast.success('Order cancelled');
+      const res = await orderService.cancelOrder(orderId);
+      const payload = res?.data?.data || {};
+      const message = res?.data?.message || 'Order cancelled';
+      if (payload.refunded) {
+        toast.success(message);
+      } else if (payload.refund_ok === false && order?.payment_status === 'paid') {
+        toast.info(message);
+      } else {
+        toast.success(message);
+      }
       await load();
       onOrderUpdated?.();
     } catch (err) {
@@ -77,9 +97,144 @@ export default function ProfileOrderDetail({ orderId, onBack, onOrderUpdated }) 
     }
   };
 
+  const submitReturn = async () => {
+    setReturning(true);
+    try {
+      await orderService.requestReturn(orderId, {
+        reason: returnReason.trim() || undefined,
+      });
+      toast.success('Return request submitted — in process');
+      setShowReturnModal(false);
+      setReturnReason('');
+      await load();
+      onOrderUpdated?.();
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? 'Could not submit return');
+    } finally {
+      setReturning(false);
+    }
+  };
+
+  const submitHelp = async () => {
+    if (!helpMessage.trim()) {
+      toast.error('Please enter a message');
+      return;
+    }
+    setSendingHelp(true);
+    try {
+      await orderService.sendHelp(orderId, { message: helpMessage.trim() });
+      setHelpMessage('');
+      setHelpSent(true);
+      await load();
+    } catch (err) {
+      toast.error(err.response?.data?.message ?? 'Could not send message');
+    } finally {
+      setSendingHelp(false);
+    }
+  };
+
+  const downloadInvoice = async () => {
+    // Open during the click gesture so browsers don't treat it as a blocked popup.
+    const invoiceWindow = openBlankInvoiceWindow();
+    if (invoiceWindow) {
+      try {
+        invoiceWindow.document.write(
+          '<p style="font-family:Arial,sans-serif;padding:24px;color:#666;">Preparing invoice…</p>'
+        );
+      } catch {
+        // ignore
+      }
+    }
+
+    setDownloadingInvoice(true);
+    try {
+      const res = await orderService.getInvoice(orderId);
+      const invoice = res.data?.data ?? null;
+      if (!invoice) {
+        throw new Error('Invoice data missing');
+      }
+      const mode = deliverInvoice(invoice, invoiceWindow);
+      toast.success(
+        mode === 'window'
+          ? 'Invoice opened — use Print / Save PDF'
+          : 'Invoice file downloaded'
+      );
+    } catch (err) {
+      try {
+        invoiceWindow?.close();
+      } catch {
+        // ignore
+      }
+      toast.error(err.response?.data?.message ?? err.message ?? 'Could not download invoice');
+    } finally {
+      setDownloadingInvoice(false);
+    }
+  };
+
   const payNow = async () => {
     setPaying(true);
     try {
+      let method = order?.payment_method;
+      if (!method) {
+        const activeRes = await paymentService.getActiveGateway();
+        method = activeRes.data?.data?.gateway || 'cashfree';
+      }
+
+      if (method === 'phonepe') {
+        const payRes = await paymentService.initiatePhonePe(orderId);
+        const pay = payRes.data?.data;
+        if (!pay?.redirect_url) {
+          throw new Error('Could not start PhonePe checkout');
+        }
+        window.location.href = pay.redirect_url;
+        return;
+      }
+
+      if (method === 'paytm') {
+        const payRes = await paymentService.initiatePaytm(orderId);
+        const pay = payRes.data?.data;
+        if (!pay?.txn_token || !pay?.mid || !pay?.paytm_order_id) {
+          throw new Error('Could not start Paytm checkout');
+        }
+        await openPaytmCheckout({
+          orderId: pay.paytm_order_id,
+          txnToken: pay.txn_token,
+          amount: pay.amount,
+          mid: pay.mid,
+          checkoutJsUrl: pay.checkout_js_url,
+        });
+        return;
+      }
+
+      if (method === 'razorpay') {
+        const payRes = await paymentService.initiateRazorpay(orderId);
+        const pay = payRes.data?.data;
+        if (!pay?.razorpay_order_id || !pay?.key_id) {
+          throw new Error('Could not start Razorpay checkout');
+        }
+        await openRazorpayCheckout({
+          keyId: pay.key_id,
+          amount: pay.amount,
+          currency: pay.currency || 'INR',
+          orderId: pay.razorpay_order_id,
+          description: `Order ${pay.order_number || orderId}`,
+          prefill: pay.prefill || {},
+          returnUrl: '/payment/razorpay/return',
+          yuloOrderId: pay.order_id || orderId,
+        });
+        return;
+      }
+
+      if (method === 'payu') {
+        const payRes = await paymentService.initiatePayU(orderId);
+        const pay = payRes.data?.data;
+        if (!pay?.action || !pay?.params) {
+          throw new Error('Could not start PayU checkout');
+        }
+        openPayUCheckout({ action: pay.action, params: pay.params });
+        return;
+      }
+
       const payRes = await paymentService.initiateCashfree(orderId);
       const pay = payRes.data?.data;
       if (!pay?.payment_session_id) {
@@ -90,7 +245,11 @@ export default function ProfileOrderDetail({ orderId, onBack, onOrderUpdated }) 
         env: pay.env || 'sandbox',
       });
     } catch (err) {
-      toast.error(err.response?.data?.message ?? err.message ?? 'Could not start payment');
+      if (err?.message === 'Payment cancelled') {
+        toast.info('Payment cancelled');
+      } else {
+        toast.error(err.response?.data?.message ?? err.message ?? 'Could not start payment');
+      }
     } finally {
       setPaying(false);
     }
@@ -164,12 +323,51 @@ export default function ProfileOrderDetail({ orderId, onBack, onOrderUpdated }) 
   const canPay =
     order.payment_status !== 'paid' &&
     order.status === 'pending' &&
-    (order.payment_method === 'cashfree' || !order.payment_method);
+    (order.payment_method === 'cashfree' ||
+      order.payment_method === 'phonepe' ||
+      order.payment_method === 'paytm' ||
+      order.payment_method === 'razorpay' ||
+      order.payment_method === 'payu' ||
+      !order.payment_method);
 
+  const isCancelled = order.status === 'cancelled';
+  const isDelivered = order.status === 'delivered';
+  const isReturned =
+    order.status === 'returned' || order.return?.status === 'completed';
+  const returnInProcess =
+    Boolean(order.return) && ['requested', 'in_process'].includes(order.return.status);
+
+  // Tracking queries only before delivery — not once delivered/returned/cancelled.
   const canRaiseQuery =
     !hasTracking &&
-    !['cancelled', 'refunded'].includes(order.status) &&
-    !pendingFollowup;
+    !pendingFollowup &&
+    !['cancelled', 'refunded', 'delivered', 'returned'].includes(order.status);
+
+  const showCancel = Boolean(order.can_cancel) && !isCancelled;
+  // Return only before a return has been decided (rejected/completed = done → use Help).
+  const returnStatusDone = ['completed', 'rejected'].includes(String(order.return?.status || ''));
+  const showReturn =
+    Boolean(order.can_return) &&
+    isDelivered &&
+    !returnInProcess &&
+    !isReturned &&
+    !returnStatusDone;
+  const showHelp = Boolean(order.can_help) || showReturn || Boolean(order.return);
+  const showInvoice = !isCancelled && order.status !== 'refunded';
+  const helpMessages = Array.isArray(order.help_messages) ? order.help_messages : [];
+
+  const openHelpModal = () => {
+    setHelpSent(false);
+    setHelpMessage('');
+    setShowHelpModal(true);
+  };
+
+  const closeHelpModal = () => {
+    if (sendingHelp) return;
+    setShowHelpModal(false);
+    setHelpSent(false);
+    setHelpMessage('');
+  };
 
   return (
     <div>
@@ -193,7 +391,7 @@ export default function ProfileOrderDetail({ orderId, onBack, onOrderUpdated }) 
             <span className="small text-muted text-capitalize">
               Payment: {order.payment_status ?? 'pending'}
             </span>
-            {hasTracking ? (
+            {hasTracking && !isCancelled ? (
               <Link to={trackLink} className="btn btn-sm btn-outline-dark">
                 Track order
               </Link>
@@ -201,7 +399,7 @@ export default function ProfileOrderDetail({ orderId, onBack, onOrderUpdated }) 
               <button type="button" className="btn btn-sm btn-outline-dark" onClick={openRaiseQuery}>
                 Raise query for tracking order
               </button>
-            ) : pendingFollowup ? (
+            ) : pendingFollowup && !isDelivered && !isCancelled && !isReturned ? (
               <span className="badge bg-warning text-dark rounded-0 text-uppercase" style={{ fontSize: '0.625rem' }}>
                 Tracking query pending
               </span>
@@ -214,13 +412,42 @@ export default function ProfileOrderDetail({ orderId, onBack, onOrderUpdated }) 
               Pay Now
             </Button>
           )}
-          {order.status === 'pending' && (
+          {showCancel && (
             <Button variant="outline" loading={cancelling} onClick={cancelOrder}>
               Cancel Order
             </Button>
           )}
+          {showReturn && (
+            <Button variant="outline" loading={returning} onClick={() => setShowReturnModal(true)}>
+              Return
+            </Button>
+          )}
+          {showHelp && (
+            <Button variant="outline" onClick={openHelpModal}>
+              Help
+            </Button>
+          )}
+          {showInvoice && (
+            <Button variant="outline" loading={downloadingInvoice} onClick={downloadInvoice}>
+              Download Invoice
+            </Button>
+          )}
         </div>
       </div>
+
+      {isCancelled ? (
+        <div className="alert alert-danger rounded-0 border mb-4 py-3">
+          <div className="fw-medium mb-1">Order cancelled</div>
+          <p className="small mb-0 text-muted">
+            {order.payment_status === 'refunded'
+              ? 'This prepaid order was cancelled and the refund has been initiated. It may take a few business days to reflect in your account.'
+              : order.payment_status === 'paid' &&
+                  String(order.payment_method || '').toLowerCase() !== 'cod'
+                ? 'This prepaid order was cancelled. If the refund did not go through automatically, our team will process it and update you.'
+                : 'This order was cancelled.'}
+          </p>
+        </div>
+      ) : null}
 
       <div className="row g-4">
         <div className="col-lg-8">
@@ -244,13 +471,158 @@ export default function ProfileOrderDetail({ orderId, onBack, onOrderUpdated }) 
             </div>
           ))}
 
+          {order.return && !isCancelled ? (
+            <div className="mt-4">
+              <h4 className="text-uppercase small fw-semibold mb-3">Return status</h4>
+              <div className="border p-3">
+                <div className="d-flex flex-wrap gap-2 mb-3">
+                  {[
+                    { key: 'requested', label: 'Requested' },
+                    { key: 'in_process', label: 'In process' },
+                    { key: 'completed', label: 'Completed' },
+                  ].map((step) => {
+                    const current = order.return.status === 'requested' ? 'requested' : order.return.status;
+                    const orderKeys = ['requested', 'in_process', 'completed'];
+                    // Map legacy/requested onto flow; rejected is separate.
+                    const activeKey =
+                      current === 'rejected'
+                        ? null
+                        : current === 'requested'
+                          ? 'in_process'
+                          : current;
+                    const activeIdx = orderKeys.indexOf(activeKey || '');
+                    const stepIdx = orderKeys.indexOf(step.key);
+                    const isActive = activeKey === step.key;
+                    const isDone = activeIdx > stepIdx && activeIdx !== -1;
+                    return (
+                      <span
+                        key={step.key}
+                        className={`badge rounded-0 text-uppercase ${
+                          isActive ? 'bg-dark' : isDone ? 'bg-secondary' : 'bg-light text-muted border'
+                        }`}
+                        style={{ fontSize: '0.625rem', letterSpacing: '0.04em' }}
+                      >
+                        {step.label}
+                      </span>
+                    );
+                  })}
+                  {order.return.status === 'rejected' ? (
+                    <span
+                      className="badge bg-danger rounded-0 text-uppercase"
+                      style={{ fontSize: '0.625rem', letterSpacing: '0.04em' }}
+                    >
+                      Rejected
+                    </span>
+                  ) : null}
+                </div>
+
+                <p className="mb-2">
+                  <strong>Current status:</strong>{' '}
+                  <span className="text-capitalize">
+                    {order.return.status === 'in_process' || order.return.status === 'requested'
+                      ? 'Return is in process'
+                      : order.return.status === 'completed'
+                        ? 'Return completed'
+                        : order.return.status === 'rejected'
+                          ? 'Return not approved'
+                          : String(order.return.status || '').replace(/_/g, ' ')}
+                  </span>
+                </p>
+                {order.return.created_at ? (
+                  <p className="small text-muted mb-2">
+                    Requested on {formatDate(order.return.created_at)}
+                    {order.return.reason ? (
+                      <>
+                        {' '}
+                        · Reason: <em>{order.return.reason}</em>
+                      </>
+                    ) : null}
+                  </p>
+                ) : null}
+
+                <div className="border bg-light p-3 mt-3">
+                  <div className="text-uppercase small fw-semibold mb-2" style={{ letterSpacing: '0.06em' }}>
+                    Updates from YULO
+                  </div>
+                  {order.return.admin_notes ? (
+                    <p className="small mb-0" style={{ whiteSpace: 'pre-wrap' }}>
+                      {order.return.admin_notes}
+                    </p>
+                  ) : returnInProcess ? (
+                    <p className="small text-muted mb-0">
+                      Return is in process. Updates from YULO will be displayed here once our team reviews your
+                      request.
+                    </p>
+                  ) : order.return.status === 'rejected' ? (
+                    <p className="small text-muted mb-0">
+                      Your previous return was not approved. Use Help to contact YULO about this order.
+                    </p>
+                  ) : (
+                    <p className="small text-muted mb-0">
+                      Your return has been completed. Further refund updates from YULO will appear here when
+                      available.
+                    </p>
+                  )}
+                </div>
+
+                <div className="border p-3 mt-3">
+                  <div className="text-uppercase small fw-semibold mb-2" style={{ letterSpacing: '0.06em' }}>
+                    Shared messages with YULO
+                  </div>
+                  {helpMessages.length === 0 ? (
+                    <p className="small text-muted mb-0">
+                      No messages yet. Use Help to contact YULO about this order — replies will show here.
+                    </p>
+                  ) : (
+                    <div className="d-flex flex-column gap-3">
+                      {helpMessages.map((msg) => (
+                        <div key={msg.id} className="small">
+                          <div className="fw-semibold text-capitalize">
+                            {msg.sender === 'admin' ? 'YULO' : 'You'}
+                            <span className="text-muted fw-normal ms-2">
+                              {msg.created_at ? formatDate(msg.created_at) : ''}
+                            </span>
+                          </div>
+                          <div style={{ whiteSpace: 'pre-wrap' }}>{msg.message}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="mt-4">
             <h4 className="text-uppercase small fw-semibold mb-3">Tracking</h4>
             <div className="border p-3">
               <p className="mb-1">
                 <strong>Status:</strong> {order.status}
               </p>
-              {hasTracking ? (
+              {isCancelled ? (
+                <p className="small text-muted mb-0">Tracking is not available for cancelled orders.</p>
+              ) : isDelivered || isReturned ? (
+                hasTracking ? (
+                  <>
+                    {delivery?.carrier ? (
+                      <p className="mb-1">
+                        <strong>Carrier:</strong> {delivery.carrier}
+                      </p>
+                    ) : null}
+                    <p className="mb-1">
+                      <strong>Tracking #:</strong> {trackingNumber}
+                    </p>
+                    <p className="mb-0">
+                      <strong>Tracking link:</strong>{' '}
+                      <Link to={trackLink}>Open track order</Link>
+                    </p>
+                  </>
+                ) : (
+                  <p className="small text-muted mb-0">
+                    {isDelivered ? 'This order has been delivered.' : 'This order was returned.'}
+                  </p>
+                )
+              ) : hasTracking ? (
                 <>
                   {delivery?.carrier ? (
                     <p className="mb-1">
@@ -326,6 +698,16 @@ export default function ProfileOrderDetail({ orderId, onBack, onOrderUpdated }) 
                 Complete Payment
               </Button>
             )}
+            {showInvoice && (
+              <Button
+                variant="outline"
+                className="w-100 mt-2"
+                loading={downloadingInvoice}
+                onClick={downloadInvoice}
+              >
+                Download Invoice
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -376,6 +758,93 @@ export default function ProfileOrderDetail({ orderId, onBack, onOrderUpdated }) 
             Send query
           </Button>
         </div>
+      </Modal>
+
+      <Modal
+        show={showReturnModal}
+        onClose={() => !returning && setShowReturnModal(false)}
+        title="Request a return"
+      >
+        <p className="small text-muted mb-3">
+          Returns are available within {(order.return_window_days ?? 7)} days after delivery when every product in
+          the order allows returns. Tell us briefly why you want to return (optional).
+        </p>
+        <div className="mb-4">
+          <label className="form-label" htmlFor="return-reason">
+            Reason (optional)
+          </label>
+          <textarea
+            id="return-reason"
+            className="form-control"
+            rows={4}
+            placeholder="e.g. Damaged item, wrong size, defective…"
+            value={returnReason}
+            onChange={(e) => setReturnReason(e.target.value)}
+            disabled={returning}
+          />
+        </div>
+        <div className="d-flex justify-content-end gap-2">
+          <Button variant="outline" disabled={returning} onClick={() => setShowReturnModal(false)}>
+            Cancel
+          </Button>
+          <Button loading={returning} onClick={submitReturn}>
+            Submit return
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal
+        show={showHelpModal}
+        onClose={closeHelpModal}
+        title="Help — contact YULO"
+      >
+        {helpSent ? (
+          <>
+            <p className="mb-4">
+              YULO received your response. We will get in touch with you shortly.
+            </p>
+            <div className="d-flex justify-content-end">
+              <Button onClick={closeHelpModal}>Close</Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="small text-muted mb-3">
+              Send a message about order #{order.order_number}. YULO will reply in Shared messages on this order.
+            </p>
+            {helpMessages.length > 0 ? (
+              <div className="border p-3 mb-3" style={{ maxHeight: 180, overflowY: 'auto' }}>
+                {helpMessages.map((msg) => (
+                  <div key={msg.id} className="small mb-2">
+                    <strong>{msg.sender === 'admin' ? 'YULO' : 'You'}:</strong> {msg.message}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <div className="mb-4">
+              <label className="form-label" htmlFor="help-message">
+                Your message
+              </label>
+              <textarea
+                id="help-message"
+                className="form-control"
+                rows={4}
+                placeholder="How can we help with this order?"
+                value={helpMessage}
+                onChange={(e) => setHelpMessage(e.target.value)}
+                disabled={sendingHelp}
+              />
+            </div>
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="outline" disabled={sendingHelp} onClick={closeHelpModal}>
+                Cancel
+              </Button>
+              <Button loading={sendingHelp} onClick={submitHelp}>
+                Send to YULO
+              </Button>
+            </div>
+          </>
+        )}
       </Modal>
     </div>
   );

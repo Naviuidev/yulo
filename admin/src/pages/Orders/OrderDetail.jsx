@@ -25,6 +25,14 @@ const OrderDetail = () => {
   const [carrier, setCarrier] = useState('');
   const [notifyTrackingEmail, setNotifyTrackingEmail] = useState(true);
   const [sharingTracking, setSharingTracking] = useState(false);
+  const [updatingReturn, setUpdatingReturn] = useState(false);
+  const [returnNotes, setReturnNotes] = useState('');
+  const [notifyReturnEmail, setNotifyReturnEmail] = useState(true);
+  const [markRefunded, setMarkRefunded] = useState(false);
+  const [helpReply, setHelpReply] = useState('');
+  const [sendingHelp, setSendingHelp] = useState(false);
+
+  const busy = updating || sharingTracking || updatingReturn || sendingHelp;
 
   const load = async () => {
     setLoading(true);
@@ -42,8 +50,14 @@ const OrderDetail = () => {
     load();
   }, [id]);
 
+  useEffect(() => {
+    setReturnNotes(order?.return?.admin_notes || '');
+    setNotifyReturnEmail(true);
+    setMarkRefunded(false);
+  }, [order?.return?.id, order?.return?.admin_notes]);
+
   const openStatusConfirm = (status) => {
-    if (!order || order.status === status || updating || sharingTracking) return;
+    if (!order || order.status === status || busy) return;
     setPendingStatus(status);
     setNotifyCustomer(true);
   };
@@ -78,7 +92,7 @@ const OrderDetail = () => {
   };
 
   const openTrackingModal = () => {
-    if (!order || updating || sharingTracking) return;
+    if (!order || busy) return;
     setTrackingNumber(order.delivery?.tracking_number || '');
     setCarrier(order.delivery?.carrier || '');
     setNotifyTrackingEmail(true);
@@ -119,6 +133,57 @@ const OrderDetail = () => {
       toast.error(err.response?.data?.message || 'Failed to share tracking');
     } finally {
       setSharingTracking(false);
+    }
+  };
+
+  const handleReturnUpdate = async (status) => {
+    if (!order?.return || updatingReturn) return;
+    setUpdatingReturn(true);
+    try {
+      const result = await orderService.updateReturn(id, {
+        status,
+        admin_notes: returnNotes.trim() || undefined,
+        notify_customer: notifyReturnEmail,
+        mark_order_returned: true,
+        mark_refunded: status === 'completed' ? markRefunded : false,
+      });
+      const labels = {
+        in_process: 'Return kept in process',
+        rejected: 'Return rejected',
+        completed: 'Return completed',
+      };
+      toast.success(labels[status] || 'Return updated');
+      if (notifyReturnEmail) {
+        if (result?.email_sent) {
+          toast.success(result.email_message || 'Customer notified');
+        } else {
+          toast.info(result?.email_message || 'Updated, but email was not sent');
+        }
+      }
+      await load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update return');
+    } finally {
+      setUpdatingReturn(false);
+    }
+  };
+
+  const sendHelpReply = async () => {
+    if (!helpReply.trim() || sendingHelp) return;
+    setSendingHelp(true);
+    try {
+      const result = await orderService.sendHelp(id, { message: helpReply.trim() });
+      toast.success('Reply shared with customer');
+      setHelpReply('');
+      if (result?.help_messages) {
+        setOrder((prev) => (prev ? { ...prev, help_messages: result.help_messages } : prev));
+      } else {
+        await load();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to send reply');
+    } finally {
+      setSendingHelp(false);
     }
   };
 
@@ -196,7 +261,7 @@ const OrderDetail = () => {
                 type="button"
                 className="btn btn-sm btn-outline-dark"
                 onClick={openTrackingModal}
-                disabled={updating || sharingTracking}
+                disabled={busy}
               >
                 Share Tracking Order
               </button>
@@ -215,7 +280,7 @@ const OrderDetail = () => {
                     key={s}
                     type="button"
                     className={`yulo-status-chip ${order.status === s ? 'is-active' : ''}`}
-                    disabled={updating || sharingTracking || order.status === s}
+                    disabled={busy || order.status === s}
                     onClick={() => openStatusConfirm(s)}
                   >
                     {ORDER_STATUS_LABELS[s]}
@@ -231,7 +296,7 @@ const OrderDetail = () => {
                     className={`yulo-status-chip yulo-status-chip--${s === 'cancelled' ? 'danger' : 'muted'} ${
                       order.status === s ? 'is-active' : ''
                     }`}
-                    disabled={updating || sharingTracking || order.status === s}
+                    disabled={busy || order.status === s}
                     onClick={() => openStatusConfirm(s)}
                   >
                     {ORDER_STATUS_LABELS[s]}
@@ -252,9 +317,9 @@ const OrderDetail = () => {
                 <dt className="col-5 text-muted">Subtotal</dt>
                 <dd className="col-7">{formatCurrency(order.subtotal)}</dd>
                 <dt className="col-5 text-muted">Shipping</dt>
-                <dd className="col-7">{formatCurrency(order.shipping_amount)}</dd>
+                <dd className="col-7">{formatCurrency(order.shipping_amount ?? order.shipping_charge)}</dd>
                 <dt className="col-5 text-muted">Discount</dt>
-                <dd className="col-7">{formatCurrency(order.discount_amount)}</dd>
+                <dd className="col-7">{formatCurrency(order.discount_amount ?? order.discount)}</dd>
                 <dt className="col-5 text-muted fw-bold">Total</dt>
                 <dd className="col-7 fw-bold text-gold">{formatCurrency(order.total)}</dd>
                 <dt className="col-5 text-muted">Payment</dt>
@@ -262,6 +327,164 @@ const OrderDetail = () => {
                   <StatusBadge status={order.payment_status} />
                 </dd>
               </dl>
+            </div>
+          </div>
+
+          {order.return ? (
+            <div className="yulo-card mb-4">
+              <div className="yulo-card-header">
+                <h5>Return</h5>
+              </div>
+              <div className="yulo-card-body small">
+                <p className="mb-2">
+                  <span className="btn btn-dark btn-sm rounded-pill py-0 px-3" style={{ pointerEvents: 'none' }}>
+                    {order.return.status === 'in_process'
+                      ? 'In process'
+                      : String(order.return.status || '').replace(/_/g, ' ')}
+                  </span>
+                </p>
+                <p className="mb-1 text-muted">
+                  Requested {order.return.created_at ? formatDateTime(order.return.created_at) : '—'}
+                </p>
+                <p className="mb-3">
+                  <strong>Customer reason:</strong> {order.return.reason || '—'}
+                </p>
+
+                {order.has_open_return ? (
+                  <>
+                    <div className="mb-3">
+                      <label className="form-label" htmlFor="return-admin-notes">
+                        Admin notes (optional)
+                      </label>
+                      <textarea
+                        id="return-admin-notes"
+                        className="form-control form-control-sm"
+                        rows={3}
+                        value={returnNotes}
+                        onChange={(e) => setReturnNotes(e.target.value)}
+                        disabled={updatingReturn}
+                        placeholder="Shared with customer when you notify them"
+                      />
+                    </div>
+                    <div className="form-check mb-2">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        id="notify-return-email"
+                        checked={notifyReturnEmail}
+                        onChange={(e) => setNotifyReturnEmail(e.target.checked)}
+                        disabled={updatingReturn || !customerEmail}
+                      />
+                      <label className="form-check-label" htmlFor="notify-return-email">
+                        Email customer
+                      </label>
+                    </div>
+                    <div className="form-check mb-3">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        id="mark-refunded-on-complete"
+                        checked={markRefunded}
+                        onChange={(e) => setMarkRefunded(e.target.checked)}
+                        disabled={updatingReturn}
+                      />
+                      <label className="form-check-label" htmlFor="mark-refunded-on-complete">
+                        On complete: also mark payment refunded
+                      </label>
+                    </div>
+                    <div className="d-flex flex-column gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-dark"
+                        disabled={updatingReturn}
+                        onClick={() => handleReturnUpdate('in_process')}
+                      >
+                        {updatingReturn ? 'Saving…' : 'Save notes / keep in process'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-danger"
+                        disabled={updatingReturn}
+                        onClick={() => handleReturnUpdate('rejected')}
+                      >
+                        Reject return
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-dark"
+                        disabled={updatingReturn}
+                        onClick={() => handleReturnUpdate('completed')}
+                      >
+                        Complete return
+                      </button>
+                    </div>
+                    <p className="text-muted mb-0 mt-2" style={{ fontSize: '0.75rem' }}>
+                      Complete sets order status to Returned and restores stock once.
+                    </p>
+                  </>
+                ) : (
+                  <p className="mb-0 text-muted">
+                    {order.return.admin_notes ? (
+                      <>
+                        <strong>Admin notes:</strong> {order.return.admin_notes}
+                      </>
+                    ) : (
+                      'This return is closed.'
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="yulo-card mb-4">
+            <div className="yulo-card-header">
+              <h5>Shared messages</h5>
+            </div>
+            <div className="yulo-card-body small">
+              {(order.help_messages || []).length === 0 ? (
+                <p className="text-muted mb-3">
+                  No customer help messages yet. When the customer uses Help on this order, messages appear here.
+                </p>
+              ) : (
+                <div className="d-flex flex-column gap-3 mb-3" style={{ maxHeight: 280, overflowY: 'auto' }}>
+                  {(order.help_messages || []).map((msg) => (
+                    <div key={msg.id} className="border-bottom pb-2">
+                      <div className="d-flex justify-content-between gap-2">
+                        <strong className="text-capitalize">
+                          {msg.sender === 'admin' ? 'YULO (you)' : 'Customer'}
+                        </strong>
+                        <span className="text-muted">
+                          {msg.created_at ? formatDateTime(msg.created_at) : ''}
+                        </span>
+                      </div>
+                      <div className="mt-1" style={{ whiteSpace: 'pre-wrap' }}>
+                        {msg.message}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <label className="form-label" htmlFor="admin-help-reply">
+                Reply to customer
+              </label>
+              <textarea
+                id="admin-help-reply"
+                className="form-control form-control-sm mb-2"
+                rows={3}
+                value={helpReply}
+                onChange={(e) => setHelpReply(e.target.value)}
+                disabled={sendingHelp}
+                placeholder="Shared with the customer on their order page"
+              />
+              <button
+                type="button"
+                className="btn btn-sm btn-dark"
+                disabled={sendingHelp || !helpReply.trim()}
+                onClick={sendHelpReply}
+              >
+                {sendingHelp ? 'Sending…' : 'Send reply'}
+              </button>
             </div>
           </div>
 
@@ -277,7 +500,7 @@ const OrderDetail = () => {
                 type="button"
                 className="btn btn-sm btn-gold mt-3"
                 onClick={openTrackingModal}
-                disabled={updating || sharingTracking}
+                disabled={busy}
               >
                 Share Tracking Order
               </button>

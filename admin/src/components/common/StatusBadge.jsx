@@ -7,7 +7,7 @@ const StatusBadge = ({ status, tone }) => {
   const label = ORDER_STATUS_LABELS[status] || status?.replace(/_/g, ' ') || 'Unknown';
 
   return (
-    <span className={`badge yulo-badge yulo-badge--${variant} text-capitalize`}>
+    <span className={`badge rounded-pill yulo-badge yulo-badge--${variant} text-capitalize`}>
       {label}
     </span>
   );

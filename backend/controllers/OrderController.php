@@ -34,6 +34,26 @@ final class OrderController extends BaseController
         }
 
         $order['items'] = $this->orderModel->getItems((int) $order['id']);
+        $order['can_cancel'] = in_array($order['status'], ['pending', 'confirmed'], true)
+            && $this->orderModel->customerCancelAllowed((int) $order['id']);
+
+        $return = $this->orderModel->getLatestReturn((int) $order['id']);
+        $order['return'] = $return;
+        $returnStatus = (string) ($return['status'] ?? '');
+        SchemaGuard::ensureOrderDeliveredAt($this->db);
+        // Rejected returns can request again within the window; open/completed cannot.
+        $order['can_return'] = (string) ($order['status'] ?? '') === 'delivered'
+            && $this->orderModel->customerReturnAllowed((int) $order['id'])
+            && $this->orderModel->withinReturnWindow($order)
+            && !in_array($returnStatus, ['requested', 'in_process', 'completed'], true);
+        $order['return_window_days'] = Order::RETURN_WINDOW_DAYS;
+        $order['help_messages'] = $this->orderModel->getHelpMessages((int) $order['id']);
+        $order['can_help'] = !in_array((string) ($order['status'] ?? ''), ['cancelled'], true)
+            && (
+                $order['can_return']
+                || $return !== null
+                || in_array((string) ($order['status'] ?? ''), ['delivered', 'returned'], true)
+            );
 
         $payStmt = $this->db->prepare('SELECT * FROM payments WHERE order_id = :order_id ORDER BY created_at DESC');
         $payStmt->execute(['order_id' => $order['id']]);
@@ -119,7 +139,7 @@ final class OrderController extends BaseController
             $this->db->beginTransaction();
 
             $paymentMethod = $input['payment_method'] ?? 'cashfree';
-            $allowedMethods = ['phonepe', 'stripe', 'cod', 'upi', 'cashfree'];
+            $allowedMethods = ['phonepe', 'stripe', 'cod', 'upi', 'cashfree', 'paytm', 'razorpay'];
             if (!in_array($paymentMethod, $allowedMethods, true)) {
                 $paymentMethod = 'cashfree';
             }
@@ -237,10 +257,203 @@ final class OrderController extends BaseController
             Response::jsonError('Order cannot be cancelled at this stage.', 422);
         }
 
-        $stmt = $this->db->prepare('UPDATE orders SET status = :status, updated_at = NOW() WHERE id = :id');
-        $stmt->execute(['status' => 'cancelled', 'id' => $order['id']]);
+        if (!$this->orderModel->customerCancelAllowed((int) $order['id'])) {
+            Response::jsonError(
+                'Cancellation is not allowed for one or more products in this order. Please contact support.',
+                422
+            );
+        }
 
-        Response::jsonSuccess(null, 'Order cancelled.');
+        $wasPaid = ($order['payment_status'] ?? '') === 'paid'
+            && strtolower((string) ($order['payment_method'] ?? '')) !== 'cod';
+
+        try {
+            $this->db->beginTransaction();
+
+            $stmt = $this->db->prepare(
+                'UPDATE orders SET status = :status, updated_at = NOW() WHERE id = :id AND status IN (\'pending\', \'confirmed\')'
+            );
+            $stmt->execute(['status' => 'cancelled', 'id' => $order['id']]);
+            if ($stmt->rowCount() === 0) {
+                $this->db->rollBack();
+                Response::jsonError('Order cannot be cancelled at this stage.', 422);
+            }
+
+            // Unpaid / COD: mark payment failed. Paid prepaid stays paid until refund runs.
+            if (!$wasPaid) {
+                $this->db->prepare(
+                    'UPDATE orders SET payment_status = :payment_status, updated_at = NOW() WHERE id = :id'
+                )->execute(['payment_status' => 'failed', 'id' => $order['id']]);
+            }
+
+            $this->orderModel->restoreStock((int) $order['id']);
+            $this->db->commit();
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('Order cancel failed: ' . $e->getMessage());
+            Response::jsonError('Could not cancel order.', 500);
+        }
+
+        $refundResult = [
+            'ok' => true,
+            'refunded' => false,
+            'message' => 'No prepaid refund required.',
+        ];
+
+        if ($wasPaid) {
+            try {
+                $refundResult = (new PaymentRefundService($this->db))->refundPaidOrder(
+                    (int) $order['id'],
+                    $order
+                );
+            } catch (Throwable $e) {
+                error_log('Prepaid refund on cancel failed: ' . $e->getMessage());
+                $refundResult = [
+                    'ok' => false,
+                    'refunded' => false,
+                    'message' => 'Order cancelled, but automatic refund failed. Our team will process it.',
+                ];
+            }
+        }
+
+        $message = 'Order cancelled. Stock restored.';
+        if ($wasPaid && !empty($refundResult['refunded'])) {
+            $message = 'Order cancelled. Prepaid payment refund initiated.';
+        } elseif ($wasPaid && empty($refundResult['refunded'])) {
+            $message = 'Order cancelled. '
+                . (string) ($refundResult['message'] ?? 'Prepaid refund will be handled by our team.');
+        }
+
+        Response::jsonSuccess([
+            'can_cancel' => false,
+            'status' => 'cancelled',
+            'payment_status' => !empty($refundResult['refunded']) ? 'refunded' : ($wasPaid ? 'paid' : 'failed'),
+            'refunded' => (bool) ($refundResult['refunded'] ?? false),
+            'refund_ok' => (bool) ($refundResult['ok'] ?? false),
+            'refund_message' => (string) ($refundResult['message'] ?? ''),
+        ], $message);
+    }
+
+    /** Customer requests a return for a delivered order (when all products allow return). */
+    public function requestReturn(array $params): void
+    {
+        $userId = $this->authUserId();
+        $orderId = (int) $params['id'];
+        $input = $this->getJsonInput();
+        $reason = trim((string) ($input['reason'] ?? ''));
+
+        $order = $this->orderModel->findById($orderId, $userId);
+        if (!$order) {
+            Response::jsonError('Order not found.', 404);
+        }
+
+        if ((string) ($order['status'] ?? '') !== 'delivered') {
+            Response::jsonError('Returns are only available after the order is delivered.', 422);
+        }
+
+        SchemaGuard::ensureOrderDeliveredAt($this->db);
+        // Reload so delivered_at is present if column was just added.
+        $order = $this->orderModel->findById($orderId, $userId) ?: $order;
+        if (!$this->orderModel->withinReturnWindow($order)) {
+            Response::jsonError(
+                'The ' . Order::RETURN_WINDOW_DAYS . '-day return window after delivery has ended.',
+                422
+            );
+        }
+
+        if (!$this->orderModel->customerReturnAllowed($orderId)) {
+            Response::jsonError(
+                'Return is not allowed for one or more products in this order. Please contact support.',
+                422
+            );
+        }
+
+        $existing = $this->orderModel->getLatestReturn($orderId);
+        $existingStatus = (string) ($existing['status'] ?? '');
+        if (in_array($existingStatus, ['requested', 'in_process', 'completed'], true)) {
+            Response::jsonError(
+                $existingStatus === 'completed'
+                    ? 'A return was already completed for this order.'
+                    : 'A return is already in process for this order.',
+                422
+            );
+        }
+
+        SchemaGuard::ensureOrderReturns($this->db);
+
+        try {
+            $stmt = $this->db->prepare(
+                'INSERT INTO order_returns (order_id, user_id, status, reason, created_at, updated_at)
+                 VALUES (:order_id, :user_id, :status, :reason, NOW(), NOW())'
+            );
+            $stmt->execute([
+                'order_id' => $orderId,
+                'user_id' => $userId,
+                'status' => 'in_process',
+                'reason' => $reason !== '' ? mb_substr($reason, 0, 2000) : null,
+            ]);
+            $returnId = (int) $this->db->lastInsertId();
+        } catch (Throwable $e) {
+            error_log('Order return request failed: ' . $e->getMessage());
+            Response::jsonError('Could not submit return request.', 500);
+        }
+
+        $this->db->prepare(
+            'INSERT INTO notifications (user_id, title, message, type, created_at)
+             VALUES (:user_id, :title, :message, :type, NOW())'
+        )->execute([
+            'user_id' => $userId,
+            'title' => 'Return in process',
+            'message' => "Your return request for order {$order['order_number']} is in process.",
+            'type' => 'order',
+        ]);
+
+        $return = $this->orderModel->getLatestReturn($orderId);
+
+        Response::jsonSuccess([
+            'can_return' => false,
+            'return' => $return ?: [
+                'id' => $returnId,
+                'status' => 'in_process',
+                'reason' => $reason !== '' ? $reason : null,
+            ],
+        ], 'Return request submitted. Our team will process it shortly.');
+    }
+
+    /** Customer sends a help message to YULO for this order. */
+    public function sendHelp(array $params): void
+    {
+        $userId = $this->authUserId();
+        $orderId = (int) $params['id'];
+        $input = $this->getJsonInput();
+        $message = trim((string) ($input['message'] ?? ''));
+
+        if ($message === '') {
+            Response::jsonError('Please enter a message for YULO support.', 422);
+        }
+
+        $order = $this->orderModel->findById($orderId, $userId);
+        if (!$order) {
+            Response::jsonError('Order not found.', 404);
+        }
+
+        if ((string) ($order['status'] ?? '') === 'cancelled') {
+            Response::jsonError('Help is not available for cancelled orders.', 422);
+        }
+
+        try {
+            $id = $this->orderModel->addHelpMessage($orderId, $userId, 'customer', $message);
+        } catch (Throwable $e) {
+            error_log('Order help message failed: ' . $e->getMessage());
+            Response::jsonError('Could not send your message.', 500);
+        }
+
+        Response::jsonSuccess([
+            'id' => $id,
+            'help_messages' => $this->orderModel->getHelpMessages($orderId),
+        ], 'Message sent to YULO. We will update you here.');
     }
 
     public function track(array $params): void
@@ -318,8 +531,13 @@ final class OrderController extends BaseController
         }
 
         $order['items'] = $this->orderModel->getItems((int) $order['id']);
-        $order['shipping_address'] = json_decode($order['shipping_address'] ?? '{}', true);
-        $order['billing_address'] = json_decode($order['billing_address'] ?? '{}', true);
+
+        $shipping = json_decode((string) ($order['shipping_address'] ?? '{}'), true);
+        $billing = json_decode((string) ($order['billing_address'] ?? '{}'), true);
+        $order['shipping_address'] = is_array($shipping) ? $shipping : [];
+        $order['billing_address'] = is_array($billing) ? $billing : [];
+        $order['invoice_number'] = (string) ($order['order_number'] ?? $order['id']);
+        $order['invoice_date'] = (string) ($order['created_at'] ?? date('Y-m-d H:i:s'));
 
         Response::jsonSuccess($order, 'Invoice data retrieved.');
     }

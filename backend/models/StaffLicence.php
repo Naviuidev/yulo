@@ -14,6 +14,7 @@ final class StaffLicence
         ['key' => 'brands', 'label' => 'Brands & Sections', 'path' => '/brands'],
         ['key' => 'inventory', 'label' => 'Inventory', 'path' => '/inventory'],
         ['key' => 'deliveries', 'label' => 'Deliveries', 'path' => '/deliveries'],
+        ['key' => 'shiprocket', 'label' => 'Shiprocket', 'path' => '/shiprocket'],
         ['key' => 'followups', 'label' => 'Followups', 'path' => '/followups'],
         ['key' => 'offer-strips', 'label' => 'Offers', 'path' => '/offer-strips'],
         ['key' => 'faqs', 'label' => 'FAQs', 'path' => '/faqs'],

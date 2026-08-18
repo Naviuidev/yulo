@@ -20,6 +20,18 @@ const orderService = {
     const res = await api.post(`/admin/orders/${id}/share-tracking`, data);
     return extractData(res);
   },
+  updateReturn: async (id, data = {}) => {
+    const res = await api.patch(`/admin/orders/${id}/return`, data);
+    return extractData(res);
+  },
+  sendHelp: async (id, data) => {
+    const res = await api.post(`/admin/orders/${id}/help`, data);
+    return extractData(res);
+  },
+  createShiprocketShipment: async (id, data = {}) => {
+    const res = await api.post(`/admin/orders/${id}/shiprocket-shipment`, data);
+    return extractData(res);
+  },
 };
 
 export default orderService;

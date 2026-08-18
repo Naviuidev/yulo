@@ -9,9 +9,12 @@ import AddressForm from '../../components/forms/AddressForm';
 import useCart from '../../hooks/useCart';
 import useAuth from '../../hooks/useAuth';
 import { formatPrice, getCartGstTax, getCartItemUnitPrice, getCartShipping } from '../../utils/formatPrice';
-import { couponService, orderService } from '../../services/orderService';
+import { couponService, orderService, paymentService } from '../../services/orderService';
 import { addressService } from '../../services/contentService';
 import { openCashfreeCheckout } from '../../utils/cashfreeCheckout';
+import { openPaytmCheckout } from '../../utils/paytmCheckout';
+import { openRazorpayCheckout } from '../../utils/razorpayCheckout';
+import { openPayUCheckout } from '../../utils/payuCheckout';
 
 function formatAddress(addr) {
   if (!addr) return '';
@@ -28,7 +31,7 @@ function normalizePhone(phone) {
 }
 
 export default function Checkout() {
-  const { items, subtotal } = useCart();
+  const { items, subtotal, refreshCart } = useCart();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
@@ -45,11 +48,17 @@ export default function Checkout() {
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [modalMode, setModalMode] = useState('list'); // list | add | edit
   const [editingAddress, setEditingAddress] = useState(null);
+  const [activeGateway, setActiveGateway] = useState(null);
+  const [gatewayReady, setGatewayReady] = useState(false);
+  const [paymentChoice, setPaymentChoice] = useState('online'); // online | cod
 
   const shipping = getCartShipping(items, subtotal);
   // Match backend: GST only on products with gst_applicable enabled.
   const tax = getCartGstTax(items, discount);
   const total = Math.max(0, Math.round((subtotal - discount + shipping + tax) * 100) / 100);
+
+  const codEligible =
+    items.length > 0 && items.every((item) => Number(item.cod_available ?? 1) === 1);
 
   const selectedAddress = useMemo(
     () => addresses.find((a) => Number(a.id) === Number(selectedAddressId)) || null,
@@ -82,6 +91,37 @@ export default function Checkout() {
     }
     loadAddresses();
   }, [authLoading, isAuthenticated, navigate, loadAddresses]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await paymentService.getActiveGateway();
+        if (cancelled) return;
+        const data = res.data?.data;
+        setActiveGateway(data?.gateway || null);
+        setGatewayReady(Boolean(data?.configured && data?.gateway));
+      } catch {
+        if (!cancelled) {
+          setActiveGateway(null);
+          setGatewayReady(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (gatewayReady) {
+      setPaymentChoice('online');
+      return;
+    }
+    if (codEligible) {
+      setPaymentChoice('cod');
+    }
+  }, [gatewayReady, codEligible]);
 
   const applyCoupon = async () => {
     const code = couponCode.trim();
@@ -195,31 +235,148 @@ export default function Checkout() {
       return;
     }
 
+    if (paymentChoice === 'cod') {
+      if (!codEligible) {
+        toast.error('Cash on Delivery is not available for one or more products in your cart.');
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await orderService.checkoutCod({
+          shipping_address_id: selectedAddressId,
+          coupon_code: couponCode || undefined,
+          shipping_charge: shipping,
+        });
+        const orderId = res.data?.data?.order_id;
+        toast.success('Order placed — pay cash on delivery');
+        try {
+          await refreshCart?.();
+        } catch {
+          // ignore
+        }
+        navigate(orderId ? `/profile?section=orders&order=${orderId}` : '/profile?section=orders', {
+          replace: true,
+        });
+      } catch (err) {
+        toast.error(err.response?.data?.message ?? err.message ?? 'Could not place COD order');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (!gatewayReady || !activeGateway) {
+      toast.error('Online payments are not available right now. Please try again later.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await orderService.checkoutCashfree({
+      const payload = {
         shipping_address_id: selectedAddressId,
         coupon_code: couponCode || undefined,
         shipping_charge: shipping,
-      });
-      const pay = res.data?.data;
-      const sessionId = pay?.payment_session_id;
-      if (!sessionId) {
-        throw new Error('Could not start Cashfree checkout. Check Admin → Payments credentials.');
+      };
+
+      if (activeGateway === 'phonepe') {
+        const res = await orderService.checkoutPhonePe(payload);
+        const pay = res.data?.data;
+        const redirectUrl = pay?.redirect_url;
+        if (!redirectUrl) {
+          throw new Error('Could not start PhonePe checkout. Check Admin → Payments credentials.');
+        }
+        window.location.href = redirectUrl;
+        return;
       }
 
-      await openCashfreeCheckout({
-        paymentSessionId: sessionId,
-        env: pay?.env || 'sandbox',
-      });
-      // If SDK did not redirect, keep user here with a clear message.
-      toast.info('Complete payment in the Cashfree window to confirm your order.');
+      if (activeGateway === 'paytm') {
+        const res = await orderService.checkoutPaytm(payload);
+        const pay = res.data?.data;
+        if (!pay?.txn_token || !pay?.mid || !pay?.paytm_order_id) {
+          throw new Error('Could not start Paytm checkout. Check Admin → Payments credentials.');
+        }
+        await openPaytmCheckout({
+          orderId: pay.paytm_order_id,
+          txnToken: pay.txn_token,
+          amount: pay.amount,
+          mid: pay.mid,
+          checkoutJsUrl: pay.checkout_js_url,
+        });
+        toast.info('Complete payment in the Paytm window to confirm your order.');
+        return;
+      }
+
+      if (activeGateway === 'razorpay') {
+        const res = await orderService.checkoutRazorpay(payload);
+        const pay = res.data?.data;
+        if (!pay?.razorpay_order_id || !pay?.key_id) {
+          throw new Error('Could not start Razorpay checkout. Check Admin → Payments credentials.');
+        }
+
+        await openRazorpayCheckout({
+          keyId: pay.key_id,
+          amount: pay.amount,
+          currency: pay.currency || 'INR',
+          orderId: pay.razorpay_order_id,
+          description: `Order ${pay.order_number || ''}`.trim(),
+          prefill: pay.prefill || {},
+          returnUrl: '/payment/razorpay/return',
+          yuloOrderId: pay.order_id,
+        });
+        // Browser navigates to the success page from the Razorpay handler.
+        return;
+      }
+
+      if (activeGateway === 'payu') {
+        const res = await orderService.checkoutPayU(payload);
+        const pay = res.data?.data;
+        if (!pay?.action || !pay?.params) {
+          throw new Error('Could not start PayU checkout. Check Admin → Payments credentials.');
+        }
+        openPayUCheckout({ action: pay.action, params: pay.params });
+        return;
+      }
+
+      if (activeGateway === 'cashfree') {
+        const res = await orderService.checkoutCashfree(payload);
+        const pay = res.data?.data;
+        const sessionId = pay?.payment_session_id;
+        if (!sessionId) {
+          throw new Error('Could not start Cashfree checkout. Check Admin → Payments credentials.');
+        }
+
+        await openCashfreeCheckout({
+          paymentSessionId: sessionId,
+          env: pay?.env || 'sandbox',
+        });
+        toast.info('Complete payment in the Cashfree window to confirm your order.');
+        return;
+      }
+
+      throw new Error('No payment gateway is published. Publish one under Admin → Payments.');
     } catch (err) {
-      toast.error(err.response?.data?.message ?? err.message ?? 'Could not start payment');
+      if (err?.message === 'Payment cancelled') {
+        toast.info('Payment cancelled');
+      } else {
+        toast.error(err.response?.data?.message ?? err.message ?? 'Could not start payment');
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  const paymentLabel =
+    activeGateway === 'phonepe'
+      ? 'PhonePe'
+      : activeGateway === 'paytm'
+        ? 'Paytm'
+        : activeGateway === 'razorpay'
+          ? 'Razorpay'
+          : activeGateway === 'payu'
+            ? 'PayU'
+            : activeGateway === 'cashfree'
+            ? 'Easy Cash (Cashfree)'
+            : null;
 
   if (authLoading || !isAuthenticated) {
     return (
@@ -288,10 +445,54 @@ export default function Checkout() {
             </div>
 
             <div className="border p-4">
-              <h5 className="text-uppercase small fw-semibold mb-2">Payment</h5>
-              <p className="small text-muted mb-0">
-                Secure checkout via Cashfree. Click <strong>Pay Now</strong> to open the payment gateway — your order is confirmed only after payment succeeds.
-              </p>
+              <h5 className="text-uppercase small fw-semibold mb-3">Payment</h5>
+              {(gatewayReady || codEligible) ? (
+                <div className="row g-2">
+                  {gatewayReady ? (
+                    <div className={codEligible ? 'col-6' : 'col-12'}>
+                      <button
+                        type="button"
+                        className={`btn w-100 py-3 ${
+                          paymentChoice === 'online' ? 'btn-dark' : 'btn-outline-dark'
+                        }`}
+                        onClick={() => setPaymentChoice('online')}
+                      >
+                        <span className="d-block fw-semibold">Pay online</span>
+                        <span className={`small d-block mt-1 ${paymentChoice === 'online' ? 'text-white-50' : 'text-muted'}`}>
+                          {paymentLabel}
+                        </span>
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {codEligible ? (
+                    <div className={gatewayReady ? 'col-6' : 'col-12'}>
+                      <button
+                        type="button"
+                        className={`btn w-100 py-3 ${
+                          paymentChoice === 'cod' ? 'btn-dark' : 'btn-outline-dark'
+                        }`}
+                        onClick={() => setPaymentChoice('cod')}
+                      >
+                        <span className="d-block fw-semibold">Cash on Delivery</span>
+                        <span className={`small d-block mt-1 ${paymentChoice === 'cod' ? 'text-white-50' : 'text-muted'}`}>
+                          Pay on delivery
+                        </span>
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="small text-muted mb-0">
+                  Online payments are not configured yet, and COD is not available for this cart.
+                </p>
+              )}
+
+              {gatewayReady && !codEligible ? (
+                <p className="small text-muted mb-0 mt-2">
+                  COD unavailable — one or more products in your cart do not allow Cash on Delivery.
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -378,8 +579,16 @@ export default function Checkout() {
                 <span>Total</span>
                 <span>{formatPrice(total, 'INR', 2)}</span>
               </div>
-              <Button className="w-100" loading={loading} onClick={payNow} disabled={!selectedAddressId}>
-                Pay Now
+              <Button
+                className="w-100"
+                loading={loading}
+                onClick={payNow}
+                disabled={
+                  !selectedAddressId ||
+                  (paymentChoice === 'online' ? !gatewayReady : !codEligible)
+                }
+              >
+                {paymentChoice === 'cod' ? 'Place COD Order' : 'Pay Now'}
               </Button>
             </div>
           </div>

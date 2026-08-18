@@ -65,6 +65,9 @@ final class Product
 
         $row['gst_applicable'] = (int) ($row['gst_applicable'] ?? 1);
         $row['custom_shipping'] = (int) ($row['custom_shipping'] ?? 0);
+        $row['cod_available'] = (int) ($row['cod_available'] ?? 1);
+        $row['cancel_available'] = (int) ($row['cancel_available'] ?? 1);
+        $row['return_available'] = (int) ($row['return_available'] ?? 1);
         $row['has_color_variants'] = (int) ($row['has_color_variants'] ?? 0);
         $row['size_option'] = (string) ($row['size_option'] ?? 'none');
         if (isset($row['shipping_price'])) {

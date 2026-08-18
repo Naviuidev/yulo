@@ -1,35 +1,57 @@
-import SEO from '../../components/common/SEO';
-import Breadcrumb from '../../components/common/Breadcrumb';
+import { Link } from 'react-router-dom';
+import LegalPage, { LegalSection } from '../../components/legal/LegalPage';
 import { BRAND_NAME } from '../../utils/constants';
 
 export default function PrivacyPolicy() {
   return (
-    <>
-      <SEO
-        title="Privacy Policy"
-        description={`${BRAND_NAME} privacy policy — how we collect and use your information.`}
-      />
-      <div className="page-header">
-        <div className="container">
-          <Breadcrumb items={[{ label: 'Privacy Policy' }]} />
-          <h1>Privacy Policy</h1>
-        </div>
-      </div>
+    <LegalPage
+      title="Privacy Policy"
+      description={`${BRAND_NAME} privacy policy — how we collect and use your information.`}
+    >
+      <LegalSection title="1. Information we collect">
+        <p>
+          At {BRAND_NAME}, we collect only the personal information needed to process orders, manage
+          your account, and improve your shopping experience — such as your name, contact details,
+          delivery address, and payment-related data from our secure payment partners.
+        </p>
+      </LegalSection>
 
-      <section className="container py-5">
-        <div className="row justify-content-center">
-          <div className="col-lg-8">
-            <p className="text-muted mb-0" style={{ lineHeight: 1.8 }}>
-              At {BRAND_NAME}, we collect only the personal information needed to process orders,
-              manage your account, and improve your shopping experience — such as your name, contact
-              details, delivery address, and payment-related data from our secure payment partners.
-              We do not sell your information to third parties, and we use industry-standard safeguards
-              to protect your data. By using our website, you agree to this policy; for any privacy
-              questions, please contact us through the Contact page.
-            </p>
-          </div>
-        </div>
-      </section>
-    </>
+      <LegalSection title="2. How we use it">
+        <p>
+          We use your information to fulfil orders, send order updates, provide customer support,
+          improve the website, and (with your consent where required) share offers or newsletters.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="3. Sharing">
+        <p>
+          We do not sell your information to third parties. We may share data with trusted partners
+          such as payment gateways, courier companies, and email service providers — only as needed
+          to run the store.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="4. Security">
+        <p>
+          We use industry-standard safeguards to protect your data. No method of transmission over
+          the internet is 100% secure; please keep your account password confidential.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="5. Your choices">
+        <p>
+          You may update your profile and addresses from your account. For access, correction, or
+          deletion requests, contact us through the <Link to="/contact">Contact</Link> page.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="6. Related policies">
+        <p>
+          See also our <Link to="/terms">Terms &amp; Conditions</Link>,{' '}
+          <Link to="/shipping-policy">Shipping Policy</Link>, and{' '}
+          <Link to="/returns-policy">Returns &amp; Refunds</Link>.
+        </p>
+      </LegalSection>
+    </LegalPage>
   );
 }

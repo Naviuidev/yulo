@@ -66,7 +66,7 @@ final class SchemaGuard
         self::$homeSectionsReady = true;
     }
 
-    /** Ensure orders.payment_method accepts cashfree. */
+    /** Ensure orders.payment_method accepts online gateways used by YULO. */
     public static function ensureCashfreePaymentMethod(PDO $db): void
     {
         static $ready = false;
@@ -77,7 +77,7 @@ final class SchemaGuard
         try {
             $db->exec(
                 "ALTER TABLE orders
-                 MODIFY COLUMN payment_method ENUM('phonepe', 'stripe', 'cod', 'upi', 'cashfree') NULL"
+                 MODIFY COLUMN payment_method ENUM('phonepe', 'stripe', 'cod', 'upi', 'cashfree', 'paytm', 'razorpay', 'payu') NULL"
             );
         } catch (Throwable) {
             // Ignore if already applied / no permission — create will surface a clear error.
@@ -95,6 +95,27 @@ final class SchemaGuard
         }
 
         self::ensureColumn($db, 'orders', 'email_notified_at', 'DATETIME NULL');
+        $ready = true;
+    }
+
+    /** Stamp when order was marked delivered (for return window). */
+    public static function ensureOrderDeliveredAt(PDO $db): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+
+        self::ensureColumn($db, 'orders', 'delivered_at', 'DATETIME NULL');
+        // Best-effort backfill so existing delivered orders get a return window anchor.
+        try {
+            $db->exec(
+                "UPDATE orders SET delivered_at = updated_at
+                 WHERE status = 'delivered' AND delivered_at IS NULL AND updated_at IS NOT NULL"
+            );
+        } catch (Throwable $e) {
+            // ignore
+        }
         $ready = true;
     }
 
@@ -130,6 +151,60 @@ final class SchemaGuard
         self::ensureColumn($db, 'products', 'colors', 'JSON NULL');
         self::ensureColumn($db, 'products', 'size_option', "VARCHAR(10) NOT NULL DEFAULT 'none'");
         self::ensureColumn($db, 'products', 'sizes', 'JSON NULL');
+        self::ensureColumn($db, 'products', 'cod_available', 'TINYINT(1) NOT NULL DEFAULT 1');
+        self::ensureColumn($db, 'products', 'cancel_available', 'TINYINT(1) NOT NULL DEFAULT 1');
+        self::ensureColumn($db, 'products', 'return_available', 'TINYINT(1) NOT NULL DEFAULT 1');
+        $ready = true;
+    }
+
+    /** Customer return requests linked to orders. */
+    public static function ensureOrderReturns(PDO $db): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+
+        $db->exec(
+            "CREATE TABLE IF NOT EXISTS order_returns (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                order_id INT UNSIGNED NOT NULL,
+                user_id INT UNSIGNED NOT NULL,
+                status ENUM('requested', 'in_process', 'completed', 'rejected') NOT NULL DEFAULT 'in_process',
+                reason TEXT NULL,
+                admin_notes TEXT NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                INDEX idx_order_returns_order (order_id),
+                INDEX idx_order_returns_user (user_id),
+                INDEX idx_order_returns_status (status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+
+        $ready = true;
+    }
+
+    /** Customer ↔ admin help messages on an order (returns / support). */
+    public static function ensureOrderHelpMessages(PDO $db): void
+    {
+        static $ready = false;
+        if ($ready) {
+            return;
+        }
+
+        $db->exec(
+            "CREATE TABLE IF NOT EXISTS order_help_messages (
+                id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                order_id INT UNSIGNED NOT NULL,
+                user_id INT UNSIGNED NOT NULL,
+                sender ENUM('customer', 'admin') NOT NULL,
+                message TEXT NOT NULL,
+                created_at DATETIME NOT NULL,
+                INDEX idx_order_help_order (order_id),
+                INDEX idx_order_help_user (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
+
         $ready = true;
     }
 

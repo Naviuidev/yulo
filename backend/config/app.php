@@ -33,10 +33,14 @@ return [
         'from_name' => $_ENV['MAIL_FROM_NAME'] ?? 'YULO',
     ],
     'phonepe' => [
+        'client_id' => $_ENV['PHONEPE_CLIENT_ID'] ?? '',
+        'client_secret' => $_ENV['PHONEPE_CLIENT_SECRET'] ?? '',
+        'client_version' => $_ENV['PHONEPE_CLIENT_VERSION'] ?? '1',
+        'env' => $_ENV['PHONEPE_ENV'] ?? 'sandbox',
+        // Legacy (v1 salt) — unused by Standard Checkout v2
         'merchant_id' => $_ENV['PHONEPE_MERCHANT_ID'] ?? '',
         'salt_key' => $_ENV['PHONEPE_SALT_KEY'] ?? '',
         'salt_index' => (int) ($_ENV['PHONEPE_SALT_INDEX'] ?? 1),
-        'env' => $_ENV['PHONEPE_ENV'] ?? 'sandbox',
         'callback_url' => $_ENV['PHONEPE_CALLBACK_URL'] ?? '',
     ],
     'cashfree' => [
@@ -44,6 +48,24 @@ return [
         'secret_key' => $_ENV['CASHFREE_SECRET_KEY'] ?? '',
         'env' => $_ENV['CASHFREE_ENV'] ?? 'sandbox',
         'webhook_url' => $_ENV['CASHFREE_WEBHOOK_URL'] ?? '',
+    ],
+    'paytm' => [
+        'mid' => $_ENV['PAYTM_MID'] ?? '',
+        'merchant_key' => $_ENV['PAYTM_MERCHANT_KEY'] ?? '',
+        'env' => $_ENV['PAYTM_ENV'] ?? 'sandbox',
+        'website' => $_ENV['PAYTM_WEBSITE'] ?? '',
+        'webhook_url' => $_ENV['PAYTM_WEBHOOK_URL'] ?? '',
+    ],
+    'razorpay' => [
+        'key_id' => $_ENV['RAZORPAY_KEY_ID'] ?? '',
+        'key_secret' => $_ENV['RAZORPAY_KEY_SECRET'] ?? '',
+        'env' => $_ENV['RAZORPAY_ENV'] ?? 'sandbox',
+        'webhook_secret' => $_ENV['RAZORPAY_WEBHOOK_SECRET'] ?? '',
+    ],
+    'payu' => [
+        'merchant_key' => $_ENV['PAYU_MERCHANT_KEY'] ?? '',
+        'merchant_salt' => $_ENV['PAYU_MERCHANT_SALT'] ?? '',
+        'env' => $_ENV['PAYU_ENV'] ?? 'sandbox',
     ],
     'shiprocket' => [
         'email' => $_ENV['SHIPROCKET_EMAIL'] ?? '',

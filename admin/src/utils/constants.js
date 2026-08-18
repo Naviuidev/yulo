@@ -70,6 +70,7 @@ export const NAV_ITEMS = [
   { path: '/brands', icon: 'bi-award', label: 'Brands & Sections', feature: 'brands' },
   { path: '/inventory', icon: 'bi-boxes', label: 'Inventory', feature: 'inventory' },
   { path: '/deliveries', icon: 'bi-truck', label: 'Deliveries', feature: 'deliveries' },
+  { path: '/shiprocket', icon: 'bi-rocket-takeoff', label: 'Shiprocket', feature: 'shiprocket' },
   { path: '/followups', icon: 'bi-chat-left-text', label: 'Followups', feature: 'followups' },
   { path: '/offer-strips', icon: 'bi-megaphone', label: 'Offers', feature: 'offer-strips' },
   { path: '/faqs', icon: 'bi-question-circle', label: 'FAQs', feature: 'faqs' },

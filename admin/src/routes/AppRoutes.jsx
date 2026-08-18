@@ -211,7 +211,14 @@ const AppRoutes = () => (
         }
       />
       <Route path="whatsapp" element={<Navigate to="/social-connects" replace />} />
-      <Route path="shiprocket" element={<Shiprocket />} />
+      <Route
+        path="shiprocket"
+        element={
+          <FeatureRoute feature="shiprocket">
+            <Shiprocket />
+          </FeatureRoute>
+        }
+      />
       <Route
         path="notifications"
         element={

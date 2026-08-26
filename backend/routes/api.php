@@ -305,6 +305,7 @@ $router->group('/admin', function (Router $router) use ($admin) {
     $router->delete('/faqs/{id}', [FaqAdminController::class, 'destroy'], $admin);
 
     $router->get('/reviews', [ReviewAdminController::class, 'index'], $admin);
+    $router->post('/reviews', [ReviewAdminController::class, 'storeStatic'], $admin);
     $router->patch('/reviews/{id}/status', [ReviewAdminController::class, 'updateStatus'], $admin);
 
     // Staff licences (master admin only — enforced in controller)

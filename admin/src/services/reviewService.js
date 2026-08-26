@@ -9,6 +9,14 @@ const reviewService = {
     const res = await api.patch(`/admin/reviews/${id}/status`, { status });
     return extractData(res);
   },
+  /** Admin dump / static review (no purchase required). */
+  createStatic: async (payload) => {
+    const isForm = typeof FormData !== 'undefined' && payload instanceof FormData;
+    const res = await api.post('/admin/reviews', payload, isForm
+      ? { headers: { 'Content-Type': undefined } }
+      : undefined);
+    return extractData(res);
+  },
 };
 
 export default reviewService;

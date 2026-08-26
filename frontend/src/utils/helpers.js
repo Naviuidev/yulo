@@ -5,6 +5,37 @@ export function getProductImage(product, index = 0) {
   return images[0];
 }
 
+/** Raw image path/URL from a product or cart line (before resolveMediaUrl). */
+export function getProductImagePath(product) {
+  if (!product) return null;
+
+  const candidates = [
+    product.primary_image,
+    product.image,
+    product.image_path,
+    product.product_image,
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim() !== '') {
+      return value.trim();
+    }
+  }
+
+  const first = Array.isArray(product.images) ? product.images[0] : null;
+  if (typeof first === 'string' && first.trim() !== '') {
+    return first.trim();
+  }
+  if (first && typeof first === 'object') {
+    const path = first.image_path || first.url || first.path || '';
+    if (typeof path === 'string' && path.trim() !== '') {
+      return path.trim();
+    }
+  }
+
+  return null;
+}
+
 /** Up to 3 resolved image URLs for product cards / galleries. */
 export function getProductImages(product, index = 0) {
   if (!product) {
@@ -20,9 +51,7 @@ export function getProductImages(product, index = 0) {
   if (fromGallery.length) return fromGallery;
 
   const single =
-    product.primary_image ||
-    product.image ||
-    product.image_path ||
+    getProductImagePath(product) ||
     PLACEHOLDER_IMAGES[index % PLACEHOLDER_IMAGES.length];
 
   return [resolveMediaUrl(single)];

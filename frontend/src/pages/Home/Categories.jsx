@@ -40,13 +40,14 @@ export default function Categories() {
           modules={[Navigation, Autoplay, FreeMode]}
           navigation
           freeMode
-          spaceBetween={16}
+          centerInsufficientSlides
+          spaceBetween={20}
           slidesPerView={2}
           autoplay={{ delay: 3500, disableOnInteraction: false }}
           breakpoints={{
-            480: { slidesPerView: 3.2, spaceBetween: 16 },
-            768: { slidesPerView: 5.5, spaceBetween: 20 },
-            1024: { slidesPerView: 7, spaceBetween: 24 },
+            480: { slidesPerView: 2, spaceBetween: 20 },
+            768: { slidesPerView: 4, spaceBetween: 24 },
+            1024: { slidesPerView: 6, spaceBetween: 28 },
           }}
         >
           {categories.map((cat) => (

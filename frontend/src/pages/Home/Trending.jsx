@@ -38,7 +38,7 @@ export default function Trending() {
     <section className="section-padding" style={{ background: 'var(--bg)' }} data-aos="fade-up">
       <div className="container">
         <div className="d-flex justify-content-between align-items-end mb-5">
-          <div className="text-center text-md-start flex-grow-1">
+          <div className="text-start flex-grow-1">
             <h2 className="section-title">{title}</h2>
             <div className="gold-line gold-line-left" />
             {description ? <p className="section-subtitle mb-0">{description}</p> : null}

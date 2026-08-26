@@ -78,4 +78,86 @@ final class ReviewAdminController extends BaseController
 
         Response::jsonSuccess(['id' => $id, 'status' => $status], 'Review status updated.');
     }
+
+    /**
+     * Admin-created “static” review (no purchase check).
+     * Used to seed / dump testimonials from Admin → Reviews → Static Reviews.
+     */
+    public function storeStatic(array $params = []): void
+    {
+        SchemaGuard::ensureReviewExtras($this->db);
+        $adminId = $this->authUserId();
+        if (!$adminId) {
+            Response::jsonError('Unauthorized.', 401);
+        }
+
+        $input = $this->getInput();
+        $productId = (int) ($input['product_id'] ?? 0);
+        $rating = (int) ($input['rating'] ?? 0);
+        $fullName = trim((string) ($input['full_name'] ?? $input['display_name'] ?? ''));
+        $comment = trim((string) ($input['comment'] ?? ''));
+        $title = trim((string) ($input['title'] ?? ''));
+        $status = trim((string) ($input['status'] ?? 'approved'));
+
+        if ($productId < 1) {
+            Response::jsonError('Select a product.', 422);
+        }
+        if ($rating < 1 || $rating > 5) {
+            Response::jsonError('Rating must be between 1 and 5.', 422);
+        }
+        if ($fullName === '' || mb_strlen($fullName) < 2) {
+            Response::jsonError('Enter a customer display name.', 422);
+        }
+        if ($comment === '') {
+            Response::jsonError('Enter a review comment.', 422);
+        }
+        if (!in_array($status, ['pending', 'approved', 'rejected'], true)) {
+            $status = 'approved';
+        }
+
+        $product = $this->db->prepare('SELECT id FROM products WHERE id = :id LIMIT 1');
+        $product->execute(['id' => $productId]);
+        if (!$product->fetch()) {
+            Response::jsonError('Product not found.', 404);
+        }
+
+        $avatarPath = null;
+        if (!empty($_FILES['avatar']) && (int) ($_FILES['avatar']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $uploader = new Uploader();
+            $result = $uploader->upload($_FILES['avatar'], 'reviews');
+            if (!$result['success']) {
+                Response::jsonError($result['message'] ?? 'Avatar upload failed.', 422);
+            }
+            $avatarPath = $result['path'] ?? null;
+        }
+
+        $stmt = $this->db->prepare(
+            'INSERT INTO reviews
+                (product_id, user_id, rating, title, comment, display_name, avatar_path, status, created_at, updated_at)
+             VALUES
+                (:product_id, :user_id, :rating, :title, :comment, :display_name, :avatar_path, :status, NOW(), NOW())'
+        );
+        $stmt->execute([
+            'product_id' => $productId,
+            'user_id' => $adminId,
+            'rating' => $rating,
+            'title' => $title !== '' ? $title : null,
+            'comment' => $comment,
+            'display_name' => $fullName,
+            'avatar_path' => $avatarPath,
+            'status' => $status,
+        ]);
+
+        Response::jsonSuccess(
+            [
+                'id' => (int) $this->db->lastInsertId(),
+                'status' => $status,
+                'product_id' => $productId,
+            ],
+            $status === 'approved'
+                ? 'Static review added and published.'
+                : 'Static review added.',
+            201
+        );
+    }
 }

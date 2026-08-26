@@ -36,7 +36,13 @@ final class Cart
                     p.custom_shipping, p.shipping_price, p.cod_available,
                     p.has_color_variants, p.colors, p.size_option, p.sizes,
                     pv.name AS variant_name, pv.price AS variant_price, pv.sale_price AS variant_sale_price,
-                    (SELECT image_path FROM product_images WHERE product_id = p.id AND is_primary = 1 LIMIT 1) AS image
+                    COALESCE(
+                        (SELECT pi.image_path FROM product_images pi
+                         WHERE pi.product_id = p.id AND pi.is_primary = 1 LIMIT 1),
+                        (SELECT pi2.image_path FROM product_images pi2
+                         WHERE pi2.product_id = p.id
+                         ORDER BY pi2.sort_order ASC, pi2.id ASC LIMIT 1)
+                    ) AS image
              FROM cart_items ci
              JOIN products p ON p.id = ci.product_id
              LEFT JOIN product_variants pv ON pv.id = ci.variant_id

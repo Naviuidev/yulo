@@ -158,6 +158,29 @@
   line-height: 1;
 }
 
+.product-card__stock-badge {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 6;
+  background: rgb(255 255 255 / 43%);
+  color: #111;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.55rem;
+  line-height: 1;
+  white-space: nowrap;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.product-card__stock-badge--out {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
 @media (max-width: 991px) {
   .product-card__actions {
     opacity: 1;
@@ -245,18 +268,6 @@
   min-width: 0;
 }
 
-.product-card__stock {
-  flex: 0 0 auto;
-  margin-left: auto;
-  font-size: 0.75rem;
-  color: var(--gray);
-  white-space: nowrap;
-}
-
-.product-card__stock--out {
-  color: #b42318;
-}
-
 /* Navbar */
 .yulo-navbar {
   position: sticky;
@@ -308,7 +319,7 @@
   }
 }
 
-/* Mobile + tablet: logo left, hamburger right (icons live in bottom nav) */
+/* Mobile + tablet: logo left, search + hamburger right */
 @media (max-width: 991.98px) {
   .yulo-navbar__inner {
     justify-content: space-between;
@@ -318,8 +329,11 @@
     margin: 0;
   }
 
-  .yulo-navbar__menu-btn {
+  .yulo-navbar__mobile-actions {
     margin-left: auto;
+  }
+
+  .yulo-navbar__menu-btn {
     font-size: 1.5rem;
   }
 }
@@ -962,6 +976,31 @@
   text-transform: uppercase;
   margin-bottom: 1.25rem;
   color: var(--secondary);
+}
+
+.yulo-footer .newsletter-form .form-control {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+  border-radius: 0;
+}
+
+.yulo-footer .newsletter-form .form-control::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.yulo-footer .newsletter-form__btn,
+.yulo-footer .newsletter-form .btn-yulo {
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+}
+
+.yulo-footer .newsletter-form__btn:hover,
+.yulo-footer .newsletter-form .btn-yulo:hover {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
 }
 
 .yulo-footer__bottom {

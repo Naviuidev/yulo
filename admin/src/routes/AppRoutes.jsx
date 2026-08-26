@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import ProtectedRoute from '../components/common/ProtectedRoute';
 import AdminLayout from '../components/layout/AdminLayout';
 import Login from '../pages/Login/Login';
@@ -31,17 +32,24 @@ import { useAuth } from '../context/AuthContext';
 import { canAccessFeature, isMasterAdmin, navItemsForUser } from '../utils/constants';
 
 function FeatureRoute({ feature, children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const location = useLocation();
+  const allowed =
+    !!user &&
+    (feature === 'admin-config' ? isMasterAdmin(user) : canAccessFeature(user, feature));
+  const fallback = user ? navItemsForUser(user)[0]?.path : null;
+  const noAccess = !!user && !allowed && !fallback;
+
+  useEffect(() => {
+    if (noAccess) {
+      logout();
+    }
+  }, [noAccess, logout]);
 
   if (loading) return null;
-  if (!user) return <Navigate to="/login" replace />;
-
-  const allowed =
-    feature === 'admin-config' ? isMasterAdmin(user) : canAccessFeature(user, feature);
+  if (!user || noAccess) return <Navigate to="/login" replace />;
 
   if (!allowed) {
-    const fallback = navItemsForUser(user)[0]?.path || '/login';
     return <Navigate to={fallback} state={{ from: location }} replace />;
   }
 

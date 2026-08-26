@@ -9,13 +9,13 @@ final class BrandController extends BaseController
     public function index(array $params = []): void
     {
         $stmt = $this->db->prepare(
-            'SELECT b.id, b.name, b.slug, b.logo, COUNT(p.id) as product_count
+            "SELECT b.id, b.name, b.slug, b.logo, COUNT(p.id) as product_count
              FROM brands b
-             LEFT JOIN products p ON p.brand_id = b.id AND p.status = :status
-             WHERE b.status = :status
-             GROUP BY b.id ORDER BY b.name ASC'
+             LEFT JOIN products p ON p.brand_id = b.id AND p.status = 'active'
+             WHERE b.status = 'active'
+             GROUP BY b.id ORDER BY b.name ASC"
         );
-        $stmt->execute(['status' => 'active']);
+        $stmt->execute();
         Response::jsonSuccess($stmt->fetchAll());
     }
 

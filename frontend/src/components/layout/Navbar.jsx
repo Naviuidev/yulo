@@ -91,15 +91,25 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* Mobile / tablet: hamburger right */}
-        <button
-          type="button"
-          className="nav-icon-btn yulo-navbar__menu-btn d-lg-none"
-          onClick={toggleMobileMenu}
-          aria-label="Menu"
-        >
-          <i className="bi bi-list" />
-        </button>
+        {/* Mobile / tablet: search then hamburger (right) */}
+        <div className="d-lg-none d-flex align-items-center gap-1 yulo-navbar__mobile-actions">
+          <button
+            type="button"
+            className="nav-icon-btn"
+            onClick={toggleSearch}
+            aria-label="Search"
+          >
+            <i className="bi bi-search" />
+          </button>
+          <button
+            type="button"
+            className="nav-icon-btn yulo-navbar__menu-btn"
+            onClick={toggleMobileMenu}
+            aria-label="Menu"
+          >
+            <i className="bi bi-list" />
+          </button>
+        </div>
       </div>
     </nav>
   );

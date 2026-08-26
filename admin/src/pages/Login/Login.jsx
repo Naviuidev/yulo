@@ -58,7 +58,14 @@ const Login = () => {
   }
 
   if (isAuthenticated) {
-    navigate(from && from !== '/login' ? from : homePathForUser(user), { replace: true });
+    const dest = from && from !== '/login' ? from : homePathForUser(user);
+    // Avoid bounce when staff has zero feature permissions.
+    if (dest === '/login' || !navItemsForUser(user).length) {
+      return (
+        <Loader fullScreen text="No admin features assigned. Ask a master admin to approve access." />
+      );
+    }
+    navigate(dest, { replace: true });
     return null;
   }
 

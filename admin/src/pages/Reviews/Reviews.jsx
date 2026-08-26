@@ -5,10 +5,12 @@ import PageHeader from '../../components/common/PageHeader';
 import Loader from '../../components/common/Loader';
 import StatusBadge from '../../components/common/StatusBadge';
 import reviewService from '../../services/reviewService';
+import productService from '../../services/productService';
 
 const TABS = [
   { id: 'received', label: 'Received Reviews', icon: 'bi-inbox' },
   { id: 'share', label: 'Share Page Link', icon: 'bi-link-45deg' },
+  { id: 'static', label: 'Static Reviews', icon: 'bi-pencil-square' },
 ];
 
 const STATUS_FILTERS = [
@@ -26,10 +28,39 @@ function resolveMediaUrl(path) {
   return `${origin}/${String(path).replace(/^\//, '')}`;
 }
 
+function getStorefrontOrigin() {
+  const fromEnv = String(import.meta.env.VITE_STOREFRONT_URL || '').trim().replace(/\/$/, '');
+  if (fromEnv) return fromEnv;
+
+  const apiUrl = String(import.meta.env.VITE_API_URL || '').trim();
+  // https://api.yulowear.in/api → https://yulowear.in
+  try {
+    if (apiUrl) {
+      const apiHost = new URL(apiUrl, window.location.origin).hostname;
+      if (apiHost.startsWith('api.')) {
+        return `${window.location.protocol}//${apiHost.slice(4)}`;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // https://admin.yulowear.in → https://yulowear.in
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host.startsWith('admin.')) {
+      return `${window.location.protocol}//${host.slice(6)}`;
+    }
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return 'http://localhost:5173';
+    }
+  }
+
+  return 'http://localhost:5173';
+}
+
 function getWriteReviewUrl() {
-  const fromEnv = (import.meta.env.VITE_STOREFRONT_URL || '').replace(/\/$/, '');
-  if (fromEnv) return `${fromEnv}/write-review`;
-  return 'http://localhost:5173/write-review';
+  return `${getStorefrontOrigin()}/write-review`;
 }
 
 function ReceivedPanel({ status }) {
@@ -186,6 +217,229 @@ function SharePanel() {
   );
 }
 
+function StaticReviewsPanel() {
+  const [products, setProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [productId, setProductId] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [rating, setRating] = useState(5);
+  const [title, setTitle] = useState('');
+  const [comment, setComment] = useState('');
+  const [status, setStatus] = useState('approved');
+  const [avatarFile, setAvatarFile] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingProducts(true);
+      try {
+        const { items } = await productService.list({ per_page: 200, page: 1 });
+        if (!cancelled) setProducts(Array.isArray(items) ? items : []);
+      } catch {
+        if (!cancelled) {
+          setProducts([]);
+          toast.error('Could not load products');
+        }
+      } finally {
+        if (!cancelled) setLoadingProducts(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const resetForm = () => {
+    setProductId('');
+    setFullName('');
+    setRating(5);
+    setTitle('');
+    setComment('');
+    setStatus('approved');
+    setAvatarFile(null);
+  };
+
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    if (!productId) {
+      toast.error('Select a product');
+      return;
+    }
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      toast.error('Enter a display name');
+      return;
+    }
+    if (!comment.trim()) {
+      toast.error('Enter a review comment');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const form = new FormData();
+      form.append('product_id', String(productId));
+      form.append('full_name', fullName.trim());
+      form.append('rating', String(rating));
+      form.append('comment', comment.trim());
+      form.append('status', status);
+      if (title.trim()) form.append('title', title.trim());
+      if (avatarFile) form.append('avatar', avatarFile);
+
+      await reviewService.createStatic(form);
+      toast.success(
+        status === 'approved'
+          ? 'Static review published'
+          : 'Static review saved'
+      );
+      resetForm();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not save review');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loadingProducts) return <Loader />;
+
+  return (
+    <div className="yulo-review-admin__static">
+      <p className="text-muted mb-4">
+        Dump reviews for any product without a customer purchase. Available when you are signed in
+        with an admin / staff licence. Published reviews appear on the storefront and under{' '}
+        <strong>Received Reviews</strong>.
+      </p>
+
+      <form onSubmit={onSubmit} className="yulo-review-admin__static-form border p-4">
+        <div className="mb-3">
+          <label className="form-label small text-uppercase fw-medium" htmlFor="static-product">
+            Product
+          </label>
+          <select
+            id="static-product"
+            className="form-select"
+            value={productId}
+            onChange={(e) => setProductId(e.target.value)}
+            required
+          >
+            <option value="">Select product…</option>
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          {!products.length ? (
+            <div className="form-text text-danger">No products found. Add products first.</div>
+          ) : null}
+        </div>
+
+        <div className="row g-3">
+          <div className="col-md-8">
+            <label className="form-label small text-uppercase fw-medium" htmlFor="static-name">
+              Customer display name
+            </label>
+            <input
+              id="static-name"
+              type="text"
+              className="form-control"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="e.g. Priya S."
+              required
+            />
+          </div>
+          <div className="col-md-4">
+            <label className="form-label small text-uppercase fw-medium" htmlFor="static-rating">
+              Rating
+            </label>
+            <select
+              id="static-rating"
+              className="form-select"
+              value={rating}
+              onChange={(e) => setRating(Number(e.target.value))}
+            >
+              {[5, 4, 3, 2, 1].map((n) => (
+                <option key={n} value={n}>
+                  {n} star{n === 1 ? '' : 's'}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-3">
+          <label className="form-label small text-uppercase fw-medium" htmlFor="static-title">
+            Title <span className="text-muted normal-case">(optional)</span>
+          </label>
+          <input
+            id="static-title"
+            type="text"
+            className="form-control"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Short headline"
+          />
+        </div>
+
+        <div className="mt-3">
+          <label className="form-label small text-uppercase fw-medium" htmlFor="static-comment">
+            Review comment
+          </label>
+          <textarea
+            id="static-comment"
+            className="form-control"
+            rows={4}
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="Write the review text…"
+            required
+          />
+        </div>
+
+        <div className="row g-3 mt-1">
+          <div className="col-md-6">
+            <label className="form-label small text-uppercase fw-medium" htmlFor="static-status">
+              Status
+            </label>
+            <select
+              id="static-status"
+              className="form-select"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="approved">Approved (live)</option>
+              <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <div className="col-md-6">
+            <label className="form-label small text-uppercase fw-medium" htmlFor="static-avatar">
+              Avatar <span className="text-muted normal-case">(optional)</span>
+            </label>
+            <input
+              id="static-avatar"
+              type="file"
+              className="form-control"
+              accept="image/*"
+              onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+            />
+          </div>
+        </div>
+
+        <div className="d-flex flex-wrap gap-2 mt-4">
+          <button type="submit" className="btn btn-dark" disabled={saving || !products.length}>
+            {saving ? 'Saving…' : 'Add static review'}
+          </button>
+          <button type="button" className="btn btn-outline-dark" onClick={resetForm} disabled={saving}>
+            Clear
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 export default function Reviews() {
   const [tab, setTab] = useState('received');
   const [statusFilter, setStatusFilter] = useState('pending');
@@ -195,7 +449,7 @@ export default function Reviews() {
       <Helmet><title>Reviews — YULO Admin</title></Helmet>
       <PageHeader
         title="Reviews"
-        subtitle="Moderate customer reviews and share the write-review page"
+        subtitle="Moderate customer reviews, share the write-review page, or dump static reviews"
       />
 
       <div className="yulo-doc-cats">
@@ -228,9 +482,10 @@ export default function Reviews() {
           </div>
           <ReceivedPanel status={statusFilter} />
         </>
-      ) : (
-        <SharePanel />
-      )}
+      ) : null}
+
+      {tab === 'share' ? <SharePanel /> : null}
+      {tab === 'static' ? <StaticReviewsPanel /> : null}
     </>
   );
 }

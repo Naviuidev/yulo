@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { toast } from 'react-toastify';
 import { cartService } from '../services/cartService';
 import { getCartItemUnitPrice, getEffectivePrice } from '../utils/formatPrice';
-import { getStoredJson, setStoredJson } from '../utils/helpers';
+import { getProductImagePath, getStoredJson, setStoredJson } from '../utils/helpers';
 import { AuthContext } from './AuthContext';
 
 export const CartContext = createContext(null);
@@ -85,7 +85,7 @@ export function CartProvider({ children }) {
               variant_id,
               size,
               color,
-              image: product.primary_image ?? product.image,
+              image: getProductImagePath(product),
             },
           ];
         }

@@ -122,7 +122,10 @@ export default function LoginForm() {
       </div>
       <Button type="submit" loading={isSubmitting} className="w-100">Sign In</Button>
       <p className="text-center mt-4 small text-muted">
-        Don&apos;t have an account? <Link to="/register">Create one</Link>
+        Don&apos;t have an account?{' '}
+        <Link to="/register" className="text-dark fw-semibold text-decoration-none">
+          Create one
+        </Link>
       </p>
     </form>
   );

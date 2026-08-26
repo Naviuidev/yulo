@@ -24,7 +24,12 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('yulo_admin_user', JSON.stringify(me));
       }
     } catch {
-      setUser(authService.getStoredUser());
+      // Stale/invalid token or API down — clear session so we don't sit on
+      // "Authenticating..." or bounce between / and /login.
+      localStorage.removeItem('yulo_admin_token');
+      localStorage.removeItem('yulo_admin_refresh');
+      localStorage.removeItem('yulo_admin_user');
+      setUser(null);
     } finally {
       setLoading(false);
     }

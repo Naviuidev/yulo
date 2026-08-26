@@ -1,32 +1,29 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useContext } from 'react';
 import useAuth from '../../hooks/useAuth';
 import useCart from '../../hooks/useCart';
 import useWishlist from '../../hooks/useWishlist';
-import { UIContext } from '../../context/UIContext';
 
 export default function BottomNav() {
   const { isAuthenticated } = useAuth();
   const { cartCount } = useCart();
   const { count: wishlistCount } = useWishlist();
-  const { toggleSearch } = useContext(UIContext);
   const { pathname } = useLocation();
 
   const accountTo = isAuthenticated ? '/profile' : '/login';
   const accountActive = pathname.startsWith('/profile') || pathname.startsWith('/orders') || pathname === '/login';
+  const shopActive = pathname.startsWith('/shop');
 
   return (
     <nav className="yulo-bottom-nav d-lg-none" aria-label="Mobile quick actions">
       <div className="yulo-bottom-nav__inner">
-        <button
-          type="button"
-          className="yulo-bottom-nav__item"
-          onClick={toggleSearch}
-          aria-label="Search"
+        <Link
+          to="/shop"
+          className={`yulo-bottom-nav__item ${shopActive ? 'is-active' : ''}`}
+          aria-label="Shop"
         >
-          <i className="bi bi-search" aria-hidden="true" />
-          <span className="yulo-bottom-nav__label">Search</span>
-        </button>
+          <i className="bi bi-shop" aria-hidden="true" />
+          <span className="yulo-bottom-nav__label">Shop</span>
+        </Link>
 
         <Link
           to={accountTo}

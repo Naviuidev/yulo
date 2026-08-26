@@ -47,6 +47,11 @@ export default function ProductCard({ product, index = 0 }) {
         {isNew ? <ProductBadge type="new" /> : null}
         {hasSale ? <ProductBadge type="sale" /> : null}
         {isFeatured && !hasSale && !isNew ? <ProductBadge type="featured" /> : null}
+        <span
+          className={`product-card__stock-badge ${stock > 0 ? '' : 'product-card__stock-badge--out'}`}
+        >
+          {stock > 0 ? `${stock} available` : 'Out of stock'}
+        </span>
 
         {multi ? (
           <Swiper
@@ -142,9 +147,6 @@ export default function ProductCard({ product, index = 0 }) {
         </div>
         <div className="product-card__meta">
           <PriceDisplay price={product.price} salePrice={hasSale ? salePrice : null} />
-          <span className={`product-card__stock ${stock > 0 ? '' : 'product-card__stock--out'}`}>
-            {stock > 0 ? `${stock} available` : 'Out of stock'}
-          </span>
         </div>
       </Link>
     </motion.div>

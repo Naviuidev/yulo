@@ -69,7 +69,7 @@ export default function Footer() {
             ) : null}
           </div>
           {Object.entries(FOOTER_LINKS).map(([title, links]) => (
-            <div key={title} className="col-6 col-lg-2">
+            <div key={title} className="col-12 col-md-6 col-lg-2">
               <h6>{title}</h6>
               <ul className="list-unstyled">
                 {links.map((l) => (
@@ -80,7 +80,7 @@ export default function Footer() {
               </ul>
             </div>
           ))}
-          <div className="col-lg-2">
+          <div className="col-12 col-md-6 col-lg-2">
             <h6>Newsletter</h6>
             <NewsletterForm />
           </div>

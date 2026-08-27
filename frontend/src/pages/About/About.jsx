@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import SEO from '../../components/common/SEO';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import Button from '../../components/ui/Button';
-import { BRAND_NAME, PLACEHOLDER_IMAGES } from '../../utils/constants';
+import { BRAND_NAME } from '../../utils/constants';
 
 export default function About() {
   return (
@@ -22,10 +22,10 @@ export default function About() {
         <div className="row g-5 align-items-start">
           <div className="col-lg-6">
             <img
-              src={PLACEHOLDER_IMAGES[0]}
-              alt="About YULO"
+              src="/about-yulo.jpg"
+              alt={`${BRAND_NAME} — Style. Quality. You.`}
               className="w-100"
-              style={{ aspectRatio: '4/5', objectFit: 'cover' }}
+              style={{ display: 'block', objectFit: 'cover' }}
             />
           </div>
           <div className="col-lg-6">
